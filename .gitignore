@@ -13,7 +13,8 @@
 /assets/js/**/*.min.js
 /assets/css/**/*.css
 /assets/vendor
-/config.php
+/.env
+!.env.example
 /storage/backups/*
 !/storage/backups/.htaccess
 !/storage/backups/index.html
@@ -31,3 +32,4 @@
 /vendor/
 /metafile
 .DS_Store
+**.pyc

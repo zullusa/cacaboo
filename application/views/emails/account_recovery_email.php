@@ -14,7 +14,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
     <title>
-        <?= $subject ?> | Easy!Appointments
+        <?= $subject ?> | CaCaBoo
     </title>
     <style>
         /* -------------------------------------
@@ -410,8 +410,8 @@
                         <tr>
                             <td class="content-block powered-by">
                                 Powered by
-                                <a href="https://easyappointments.org" style="text-decoration: none;">
-                                    Easy!Appointments
+                                <a href="https://sto-pitstop.ru" style="text-decoration: none;">
+                                    CaCaBoo
                                 </a>
                                 |
                                 <a href="<?= e($settings['company_link']) ?>" style="text-decoration: none;">

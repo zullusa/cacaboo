@@ -20,7 +20,7 @@
  */
 class Secretaries extends EA_Controller
 {
-    public array $allowed_provider_fields = ['id', 'first_name', 'last_name'];
+    public array $allowed_provider_fields = ['id', 'name'];
     public array $allowed_secretary_fields = [
         'id',
         'first_name',
@@ -107,7 +107,7 @@ class Secretaries extends EA_Controller
             'min_password_length' => MIN_PASSWORD_LENGTH,
             'providers' => filter_sensitive_users_data($providers),
             'default_language' => setting('default_language'),
-            'default_timezone' => setting('default_timezone'),
+            'default_timezone' => setting('default_timezone', 'Europe/Moscow'),
         ]);
 
         html_vars([

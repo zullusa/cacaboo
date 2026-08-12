@@ -83,6 +83,11 @@ App.Pages.LdapSettings = (function () {
         $('[data-field]').each((index, field) => {
             const $field = $(field);
 
+            // The password is masked in the UI, so an empty value must not overwrite the stored one.
+            if ($field.data('field') === 'ldap_password' && !$field.val()) {
+                return;
+            }
+
             ldapSettings.push({
                 name: $field.data('field'),
                 value: $field.is(':checkbox') ? Number($field.prop('checked')) : $field.val(),
@@ -205,9 +210,9 @@ App.Pages.LdapSettings = (function () {
                 </div>
                 <div class="card-body p-2">
                     <p class="d-block mb-2">${lang('content')}</p>
-                    
+
                     <pre class="overflow-y-auto bg-light rounded p-2" style="max-height: 200px">${JSON.stringify(entry, null, 2)}</pre>
-                    
+
                     <div class="d-lg-flex">
                         <button class="btn btn-outline-primary btn-sm px-4 ldap-import ms-lg-auto">
                             ${lang('import')}

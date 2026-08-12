@@ -108,7 +108,14 @@
 <?php component('appointments_modal', [
     'available_services' => vars('available_services'),
     'appointment_status_options' => vars('appointment_status_options'),
-    'timezones' => vars('timezones'),
+    'display_first_name' => vars('display_first_name'),
+    'display_last_name' => vars('display_last_name'),
+    'display_email' => vars('display_email'),
+    'display_phone_number' => vars('display_phone_number'),
+    'display_address' => vars('display_address'),
+    'display_city' => vars('display_city'),
+    'display_zip_code' => vars('display_zip_code'),
+    'display_notes' => vars('display_notes'),
     'require_first_name' => vars('require_first_name'),
     'require_last_name' => vars('require_last_name'),
     'require_email' => vars('require_email'),
@@ -119,10 +126,7 @@
     'require_notes' => vars('require_notes'),
 ]); ?>
 
-<?php component('unavailabilities_modal', [
-    'timezones' => vars('timezones'),
-    'timezone' => vars('timezone'),
-]); ?>
+<?php component('unavailabilities_modal'); ?>
 
 <?php component('working_plan_exceptions_modal'); ?>
 

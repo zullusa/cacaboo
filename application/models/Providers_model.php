@@ -16,6 +16,11 @@
  *
  * Handles all the database operations of the provider resource.
  *
+ * Providers are standalone entities (they are NOT system users). Each provider only has a name and a list of assigned
+ * services. All the remaining attributes that are still expected by the rest of the application (email, settings,
+ * working plan, timezone, ...) are provided as compatibility shims so that existing consumers keep working without
+ * any additional changes.
+ *
  * @package Models
  */
 class Providers_model extends EA_Model
@@ -25,8 +30,6 @@ class Providers_model extends EA_Model
      */
     protected array $casts = [
         'id' => 'integer',
-        'is_private' => 'boolean',
-        'id_roles' => 'integer',
     ];
 
     /**
@@ -34,21 +37,11 @@ class Providers_model extends EA_Model
      */
     protected array $api_resource = [
         'id' => 'id',
+        'name' => 'name',
         'firstName' => 'first_name',
         'lastName' => 'last_name',
         'email' => 'email',
-        'mobile' => 'mobile_number',
-        'phone' => 'phone_number',
-        'address' => 'address',
-        'city' => 'city',
-        'state' => 'state',
-        'zip' => 'zip_code',
-        'timezone' => 'timezone',
-        'language' => 'language',
-        'notes' => 'notes',
-        'isPrivate' => 'is_private',
-        'ldapDn' => 'ldap_dn',
-        'roleId' => 'id_roles',
+        'services' => 'services',
     ];
 
     /**
@@ -83,7 +76,7 @@ class Providers_model extends EA_Model
     {
         // If a provider ID is provided then check whether the record really exists in the database.
         if (!empty($provider['id'])) {
-            $count = $this->db->get_where('users', ['id' => $provider['id']])->num_rows();
+            $count = $this->db->get_where('providers', ['id' => $provider['id']])->num_rows();
 
             if (!$count) {
                 throw new InvalidArgumentException(
@@ -92,14 +85,9 @@ class Providers_model extends EA_Model
             }
         }
 
-        // Make sure all required fields are provided.
-        if (empty($provider['first_name']) || empty($provider['last_name']) || empty($provider['email'])) {
-            throw new InvalidArgumentException('Not all required fields are provided: ' . print_r($provider, true));
-        }
-
-        // Validate the email address.
-        if (!filter_var($provider['email'], FILTER_VALIDATE_EMAIL)) {
-            throw new InvalidArgumentException('Invalid email address provided: ' . $provider['email']);
+        // The provider name is the only required field.
+        if (empty($provider['name'])) {
+            throw new InvalidArgumentException('The provider name is required: ' . print_r($provider, true));
         }
 
         // Validate provider services.
@@ -113,82 +101,6 @@ class Providers_model extends EA_Model
                 }
             }
         }
-
-        // Make sure the username is unique.
-        if (!empty($provider['settings']['username'])) {
-            $provider_id = $provider['id'] ?? null;
-
-            if (!$this->validate_username($provider['settings']['username'], $provider_id)) {
-                throw new InvalidArgumentException(
-                    'The provided username is already in use, please use a different one.',
-                );
-            }
-        }
-
-        // Validate the password.
-        if (!empty($provider['settings']['password'])) {
-            if (strlen($provider['settings']['password']) < MIN_PASSWORD_LENGTH) {
-                throw new InvalidArgumentException(
-                    'The provider password must be at least ' . MIN_PASSWORD_LENGTH . ' characters long.',
-                );
-            }
-        }
-
-        // New users must always have a password value set.
-        if (empty($provider['id']) && empty($provider['settings']['password'])) {
-            throw new InvalidArgumentException('The provider password cannot be empty when inserting a new record.');
-        }
-
-        // Validate calendar view type value.
-        if (
-            !empty($provider['settings']['calendar_view']) &&
-            !in_array($provider['settings']['calendar_view'], [CALENDAR_VIEW_DEFAULT, CALENDAR_VIEW_TABLE])
-        ) {
-            throw new InvalidArgumentException(
-                'The provided calendar view is invalid: ' . $provider['settings']['calendar_view'],
-            );
-        }
-
-        // Make sure the email address is unique.
-        $provider_id = $provider['id'] ?? null;
-
-        $count = $this->db
-            ->select()
-            ->from('users')
-            ->join('roles', 'roles.id = users.id_roles', 'inner')
-            ->where('roles.slug', DB_SLUG_PROVIDER)
-            ->where('users.email', $provider['email'])
-            ->where('users.id !=', $provider_id)
-            ->get()
-            ->num_rows();
-
-        if ($count > 0) {
-            throw new InvalidArgumentException(
-                'The provided email address is already in use, please use a different one.',
-            );
-        }
-    }
-
-    /**
-     * Validate the provider username.
-     *
-     * @param string $username Provider username.
-     * @param int|null $provider_id Provider ID.
-     *
-     * @return bool Returns the validation result.
-     */
-    public function validate_username(string $username, ?int $provider_id = null): bool
-    {
-        if (!empty($provider_id)) {
-            $this->db->where('id_users !=', $provider_id);
-        }
-
-        return $this->db
-            ->from('users')
-            ->join('user_settings', 'user_settings.id_users = users.id', 'inner')
-            ->where(['username' => $username])
-            ->get()
-            ->num_rows() === 0;
     }
 
     /**
@@ -207,8 +119,6 @@ class Providers_model extends EA_Model
         ?int $offset = null,
         ?string $order_by = null,
     ): array {
-        $role_id = $this->get_provider_role_id();
-
         if ($where !== null) {
             $this->db->where($where);
         }
@@ -217,47 +127,43 @@ class Providers_model extends EA_Model
             $this->db->order_by($this->quote_order_by($order_by));
         }
 
-        $providers = $this->db->get_where('users', ['id_roles' => $role_id], $limit, $offset)->result_array();
+        $providers = $this->db->get('providers', $limit, $offset)->result_array();
 
         foreach ($providers as &$provider) {
-            $this->cast($provider);
-            $provider['settings'] = $this->get_settings($provider['id']);
-            $provider['services'] = $this->get_service_ids($provider['id']);
+            $this->decorate($provider);
         }
 
         return $providers;
     }
 
     /**
-     * Get the provider role ID.
-     *
-     * @return int Returns the role ID.
-     */
-    public function get_provider_role_id(): int
-    {
-        $role = $this->db->get_where('roles', ['slug' => DB_SLUG_PROVIDER])->row_array();
-
-        if (empty($role)) {
-            throw new RuntimeException('The provider role was not found in the database.');
-        }
-
-        return $role['id'];
-    }
-
-    /**
      * Get the provider settings.
      *
-     * @param int $provider_id Provider ID.
+     * Providers do not have their own settings anymore. The returned values are compatibility shims so that the
+     * rest of the application (availability, calendar, sync, ...) keeps working. The working plan comes from the
+     * company business logic and the exceptions from the dedicated working plan exceptions table.
      *
-     * @throws InvalidArgumentException
+     * @param int $provider_id Provider ID.
      */
     public function get_settings(int $provider_id): array
     {
-        $settings = $this->db->get_where('user_settings', ['id_users' => $provider_id])->row_array();
+        $settings = [
+            'username' => '',
+            'notifications' => false,
+            'calendar_view' => CALENDAR_VIEW_DEFAULT,
+            'google_sync' => false,
+            'google_token' => null,
+            'google_calendar' => null,
+            'caldav_sync' => false,
+            'caldav_url' => '',
+            'caldav_username' => '',
+            'caldav_password' => '',
+            'sync_future_days' => 5,
+            'sync_past_days' => 5,
+            'working_plan' => setting('company_working_plan'),
+        ];
 
-        unset($settings['id_users'], $settings['password'], $settings['salt']);
-
-        // Get working plan exceptions from the new table in array format
+        // Get working plan exceptions from the dedicated table in array format.
         $this->load->model('working_plan_exceptions_model');
         $exceptions = $this->working_plan_exceptions_model->get_all_by_provider($provider_id);
         $settings['working_plan_exceptions'] = json_encode($exceptions);
@@ -298,23 +204,17 @@ class Providers_model extends EA_Model
     {
         $provider['create_datetime'] = date('Y-m-d H:i:s');
         $provider['update_datetime'] = date('Y-m-d H:i:s');
-        $provider['id_roles'] = $this->get_provider_role_id();
 
-        $service_ids = $provider['services'];
-
-        $settings = $provider['settings'];
+        $service_ids = $provider['services'] ?? [];
 
         unset($provider['services'], $provider['settings']);
 
-        if (!$this->db->insert('users', $provider)) {
+        if (!$this->db->insert('providers', $provider)) {
             throw new RuntimeException('Could not insert provider.');
         }
 
         $provider['id'] = $this->db->insert_id();
-        $settings['salt'] = generate_salt();
-        $settings['password'] = hash_password($settings['salt'], $settings['password']);
 
-        $this->set_settings($provider['id'], $settings);
         $this->set_service_ids($provider['id'], $service_ids);
 
         return $provider['id'];
@@ -323,26 +223,21 @@ class Providers_model extends EA_Model
     /**
      * Save the provider settings.
      *
+     * Providers no longer have their own settings. This method is kept as a compatibility no-op so that existing
+     * callers (e.g. the Google sync and business settings flows) do not break. Working plan exceptions are still
+     * persisted to the dedicated table so that the calendar table view keeps working.
+     *
      * @param int $provider_id Provider ID.
      * @param array $settings Associative array with the settings data.
-     *
-     * @throws InvalidArgumentException
      */
     public function set_settings(int $provider_id, array $settings): void
     {
         if (empty($settings)) {
-            throw new InvalidArgumentException('The settings argument cannot be empty.');
-        }
-
-        // Make sure the settings record exists in the database.
-        $count = $this->db->get_where('user_settings', ['id_users' => $provider_id])->num_rows();
-
-        if (!$count) {
-            $this->db->insert('user_settings', ['id_users' => $provider_id]);
+            return;
         }
 
         foreach ($settings as $name => $value) {
-            // Working plan exceptions are now stored in a separate table
+            // Working plan exceptions are stored in a separate table.
             if ($name === 'working_plan_exceptions') {
                 $this->load->model('working_plan_exceptions_model');
 
@@ -352,7 +247,7 @@ class Providers_model extends EA_Model
                     $exceptions = [];
                 }
 
-                // Get existing exception IDs for this provider
+                // Get existing exception IDs for this provider.
                 $existing_exceptions = $this->db
                     ->select('id')
                     ->from('working_plan_exceptions')
@@ -363,13 +258,13 @@ class Providers_model extends EA_Model
                 $existing_ids = array_column($existing_exceptions, 'id');
                 $new_ids = [];
 
-                // Save or update exceptions
+                // Save or update exceptions.
                 foreach ($exceptions as $exception) {
                     $exception_id = $this->save_working_plan_exception($provider_id, $exception);
                     $new_ids[] = $exception_id;
                 }
 
-                // Delete exceptions that were not in the new list
+                // Delete exceptions that were not in the new list.
                 $ids_to_delete = array_diff($existing_ids, $new_ids);
                 if (!empty($ids_to_delete)) {
                     $this->db->where_in('id', $ids_to_delete)->delete('working_plan_exceptions');
@@ -377,13 +272,13 @@ class Providers_model extends EA_Model
 
                 continue;
             }
-
-            $this->set_setting($provider_id, $name, $value);
         }
     }
 
     /**
      * Set the value of a provider setting.
+     *
+     * Providers no longer have their own settings so this method is a compatibility no-op.
      *
      * @param int $provider_id Provider ID.
      * @param string $name Setting name.
@@ -391,9 +286,7 @@ class Providers_model extends EA_Model
      */
     public function set_setting(int $provider_id, string $name, mixed $value = null): void
     {
-        if (!$this->db->update('user_settings', [$name => $value], ['id_users' => $provider_id])) {
-            throw new RuntimeException('Could not set the new provider setting value: ' . $name);
-        }
+        //
     }
 
     /**
@@ -409,31 +302,14 @@ class Providers_model extends EA_Model
     {
         $provider['update_datetime'] = date('Y-m-d H:i:s');
 
-        $service_ids = $provider['services'];
-
-        $settings = $provider['settings'];
+        $service_ids = $provider['services'] ?? [];
 
         unset($provider['services'], $provider['settings']);
 
-        if (isset($settings['password'])) {
-            $existing_settings = $this->db->get_where('user_settings', ['id_users' => $provider['id']])->row_array();
-
-            if (empty($existing_settings)) {
-                throw new RuntimeException('No settings record found for provider with ID: ' . $provider['id']);
-            }
-
-            if (empty($existing_settings['salt'])) {
-                $existing_settings['salt'] = $settings['salt'] = generate_salt();
-            }
-
-            $settings['password'] = hash_password($existing_settings['salt'], $settings['password']);
-        }
-
-        if (!$this->db->update('users', $provider, ['id' => $provider['id']])) {
+        if (!$this->db->update('providers', $provider, ['id' => $provider['id']])) {
             throw new RuntimeException('Could not update provider.');
         }
 
-        $this->set_settings($provider['id'], $settings);
         $this->set_service_ids($provider['id'], $service_ids);
 
         return $provider['id'];
@@ -463,13 +339,16 @@ class Providers_model extends EA_Model
     /**
      * Remove an existing provider from the database.
      *
+     * The related appointments, services_providers, working plan exceptions and secretaries_providers records are
+     * removed by the ON DELETE CASCADE foreign keys.
+     *
      * @param int $provider_id Provider ID.
      *
      * @throws RuntimeException
      */
     public function delete(int $provider_id): void
     {
-        $this->db->delete('users', ['id' => $provider_id]);
+        $this->db->delete('providers', ['id' => $provider_id]);
     }
 
     /**
@@ -493,7 +372,7 @@ class Providers_model extends EA_Model
         }
 
         // Check whether the provider exists.
-        $query = $this->db->get_where('users', ['id' => $provider_id]);
+        $query = $this->db->get_where('providers', ['id' => $provider_id]);
 
         if (!$query->num_rows()) {
             throw new InvalidArgumentException(
@@ -516,20 +395,19 @@ class Providers_model extends EA_Model
     /**
      * Get the value of a provider setting.
      *
+     * Providers no longer have their own settings so the requested value is a compatibility shim. The working plan
+     * is always the company working plan and every other setting is returned as disabled.
+     *
      * @param int $provider_id Provider ID.
      * @param string $name Setting name.
      *
-     * @return string Returns the value of the requested user setting.
+     * @return string Returns the value of the requested setting.
      */
     public function get_setting(int $provider_id, string $name): string
     {
-        $settings = $this->db->get_where('user_settings', ['id_users' => $provider_id])->row_array();
+        $settings = $this->get_settings($provider_id);
 
-        if (!array_key_exists($name, $settings)) {
-            throw new RuntimeException('The requested setting value was not found: ' . $provider_id);
-        }
-
-        return $settings[$name];
+        return $settings[$name] ?? '';
     }
 
     /**
@@ -560,7 +438,7 @@ class Providers_model extends EA_Model
             throw new InvalidArgumentException('Working plan exception start date must be before or equal to end date.');
         }
 
-        // If start_time and end_time are provided, validate them
+        // If start_time and end_time are provided, validate them.
         if (!empty($start_time) && !empty($end_time)) {
             $start = date('H:i', strtotime($start_time));
             $end = date('H:i', strtotime($end_time));
@@ -571,12 +449,7 @@ class Providers_model extends EA_Model
         }
 
         // Make sure the provider record exists.
-        $where = [
-            'id' => $provider_id,
-            'id_roles' => $this->db->get_where('roles', ['slug' => DB_SLUG_PROVIDER])->row()->id,
-        ];
-
-        if ($this->db->get_where('users', $where)->num_rows() === 0) {
+        if ($this->db->get_where('providers', ['id' => $provider_id])->num_rows() === 0) {
             throw new InvalidArgumentException('Provider ID was not found in the database: ' . $provider_id);
         }
 
@@ -609,7 +482,7 @@ class Providers_model extends EA_Model
      */
     public function find(int $provider_id): array
     {
-        $provider = $this->db->get_where('users', ['id' => $provider_id])->row_array();
+        $provider = $this->db->get_where('providers', ['id' => $provider_id])->row_array();
 
         if (!$provider) {
             throw new InvalidArgumentException(
@@ -617,9 +490,7 @@ class Providers_model extends EA_Model
             );
         }
 
-        $this->cast($provider);
-        $provider['settings'] = $this->get_settings($provider['id']);
-        $provider['services'] = $this->get_service_ids($provider['id']);
+        $this->decorate($provider);
 
         return $provider;
     }
@@ -642,46 +513,37 @@ class Providers_model extends EA_Model
     /**
      * Get all the provider records that are assigned to at least one service.
      *
-     * @param bool $without_private Only include the public providers.
+     * @param bool $without_private Only include the public providers (kept for compatibility, providers have no
+     * privacy flag anymore).
      *
      * @return array Returns an array of providers.
      */
     public function get_available_providers(bool $without_private = false): array
     {
-        if ($without_private) {
-            $this->db->where('users.is_private', false);
-        }
-
         $providers = $this->db
-            ->select('users.*')
-            ->from('users')
-            ->join('roles', 'roles.id = users.id_roles', 'inner')
-            ->join('services_providers', 'services_providers.id_users = users.id', 'inner')
-            ->where('roles.slug', DB_SLUG_PROVIDER)
-            ->order_by('first_name ASC, last_name ASC, email ASC')
-            ->group_by('users.id')
+            ->select('providers.*')
+            ->from('providers')
+            ->join('services_providers', 'services_providers.id_users = providers.id', 'inner')
+            ->order_by('name ASC')
+            ->group_by('providers.id')
             ->get()
             ->result_array();
 
         foreach ($providers as &$provider) {
-            $this->cast($provider);
-            $provider['settings'] = $this->get_settings($provider['id']);
-            $provider['services'] = $this->get_service_ids($provider['id']);
+            $this->decorate($provider);
         }
 
         return $providers;
     }
 
     /**
-     * Get the query builder interface, configured for use with the users (provider-filtered) table.
+     * Get the query builder interface, configured for use with the providers table.
      *
      * @return CI_DB_query_builder
      */
     public function query(): CI_DB_query_builder
     {
-        $role_id = $this->get_provider_role_id();
-
-        return $this->db->from('users')->where('id_roles', $role_id);
+        return $this->db->from('providers');
     }
 
     /**
@@ -696,24 +558,11 @@ class Providers_model extends EA_Model
      */
     public function search(string $keyword, ?int $limit = null, ?int $offset = null, ?string $order_by = null): array
     {
-        $role_id = $this->get_provider_role_id();
-
         $providers = $this->db
             ->select()
-            ->from('users')
-            ->where('id_roles', $role_id)
+            ->from('providers')
             ->group_start()
-            ->like('first_name', $keyword)
-            ->or_like('last_name', $keyword)
-            ->or_like('CONCAT_WS(" ", first_name, last_name)', $keyword)
-            ->or_like('email', $keyword)
-            ->or_like('phone_number', $keyword)
-            ->or_like('mobile_number', $keyword)
-            ->or_like('address', $keyword)
-            ->or_like('city', $keyword)
-            ->or_like('state', $keyword)
-            ->or_like('zip_code', $keyword)
-            ->or_like('notes', $keyword)
+            ->like('name', $keyword)
             ->group_end()
             ->limit($limit)
             ->offset($offset)
@@ -722,9 +571,7 @@ class Providers_model extends EA_Model
             ->result_array();
 
         foreach ($providers as &$provider) {
-            $this->cast($provider);
-            $provider['settings'] = $this->get_settings($provider['id']);
-            $provider['services'] = $this->get_service_ids($provider['id']);
+            $this->decorate($provider);
         }
 
         return $providers;
@@ -739,17 +586,14 @@ class Providers_model extends EA_Model
      */
     public function to_options(array|string|null $where = null): array
     {
-        $role_id = $this->get_provider_role_id();
-
         if ($where !== null) {
             $this->db->where($where);
         }
 
         $providers = $this->db
-            ->select('id, first_name, last_name')
-            ->from('users')
-            ->where('id_roles', $role_id)
-            ->order_by('first_name, last_name')
+            ->select('id, name')
+            ->from('providers')
+            ->order_by('name')
             ->get()
             ->result_array();
 
@@ -758,7 +602,7 @@ class Providers_model extends EA_Model
         foreach ($providers as $provider) {
             $options[] = [
                 'value' => (int) $provider['id'],
-                'label' => trim($provider['first_name'] . ' ' . $provider['last_name']),
+                'label' => $provider['name'],
             ];
         }
 
@@ -785,7 +629,7 @@ class Providers_model extends EA_Model
                     ->select('services.*')
                     ->from('services')
                     ->join('services_providers', 'services_providers.id_services = services.id', 'inner')
-                    ->where('id_users', $provider['id'])
+                    ->where('services_providers.id_users', $provider['id'])
                     ->get()
                     ->result_array(),
                 default => throw new InvalidArgumentException(
@@ -804,20 +648,10 @@ class Providers_model extends EA_Model
     {
         $encoded_resource = [
             'id' => array_key_exists('id', $provider) ? (int) $provider['id'] : null,
-            'firstName' => $provider['first_name'],
-            'lastName' => $provider['last_name'],
-            'email' => $provider['email'],
-            'mobile' => $provider['mobile_number'],
-            'phone' => $provider['phone_number'],
-            'address' => $provider['address'],
-            'city' => $provider['city'],
-            'state' => $provider['state'],
-            'zip' => $provider['zip_code'],
-            'notes' => $provider['notes'],
-            'isPrivate' => $provider['is_private'],
-            'ldapDn' => $provider['ldap_dn'],
-            'timezone' => $provider['timezone'],
-            'language' => $provider['language'],
+            'name' => $provider['name'] ?? null,
+            'firstName' => $provider['first_name'] ?? $provider['name'] ?? null,
+            'lastName' => $provider['last_name'] ?? '',
+            'email' => $provider['email'] ?? '',
         ];
 
         if (array_key_exists('services', $provider)) {
@@ -826,42 +660,24 @@ class Providers_model extends EA_Model
 
         if (array_key_exists('settings', $provider)) {
             $encoded_resource['settings'] = [
-                'username' => $provider['settings']['username'],
-                'notifications' => filter_var($provider['settings']['notifications'], FILTER_VALIDATE_BOOLEAN),
-                'calendarView' => $provider['settings']['calendar_view'],
-                'googleSync' => array_key_exists('google_sync', $provider['settings'])
-                    ? filter_var($provider['settings']['google_sync'], FILTER_VALIDATE_BOOLEAN)
-                    : null,
-                'googleToken' => array_key_exists('google_token', $provider['settings'])
-                    ? $provider['settings']['google_token']
-                    : null,
-                'googleCalendar' => array_key_exists('google_calendar', $provider['settings'])
-                    ? $provider['settings']['google_calendar']
-                    : null,
-                'caldavSync' => array_key_exists('caldav_sync', $provider['settings'])
-                    ? filter_var($provider['settings']['caldav_sync'], FILTER_VALIDATE_BOOLEAN)
-                    : null,
-                'caldavUrl' => array_key_exists('caldav_url', $provider['settings'])
-                    ? $provider['settings']['caldav_url']
-                    : null,
-                'caldavUsername' => array_key_exists('caldav_username', $provider['settings'])
-                    ? $provider['settings']['caldav_username']
-                    : null,
-                'caldavPassword' => array_key_exists('caldav_password', $provider['settings'])
-                    ? $provider['settings']['caldav_password']
-                    : null,
-                'syncFutureDays' => array_key_exists('sync_future_days', $provider['settings'])
-                    ? (int) $provider['settings']['sync_future_days']
-                    : null,
-                'syncPastDays' => array_key_exists('sync_past_days', $provider['settings'])
-                    ? (int) $provider['settings']['sync_past_days']
-                    : null,
+                'username' => $provider['settings']['username'] ?? '',
+                'notifications' => filter_var($provider['settings']['notifications'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                'calendarView' => $provider['settings']['calendar_view'] ?? CALENDAR_VIEW_DEFAULT,
+                'googleSync' => filter_var($provider['settings']['google_sync'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                'googleToken' => $provider['settings']['google_token'] ?? null,
+                'googleCalendar' => $provider['settings']['google_calendar'] ?? null,
+                'caldavSync' => filter_var($provider['settings']['caldav_sync'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                'caldavUrl' => $provider['settings']['caldav_url'] ?? '',
+                'caldavUsername' => $provider['settings']['caldav_username'] ?? '',
+                'caldavPassword' => $provider['settings']['caldav_password'] ?? '',
+                'syncFutureDays' => (int) ($provider['settings']['sync_future_days'] ?? 5),
+                'syncPastDays' => (int) ($provider['settings']['sync_past_days'] ?? 5),
                 'workingPlan' => array_key_exists('working_plan', $provider['settings'])
                     ? json_decode($provider['settings']['working_plan'], true)
                     : null,
                 'workingPlanExceptions' => array_key_exists('working_plan_exceptions', $provider['settings'])
                     ? json_decode($provider['settings']['working_plan_exceptions'], true)
-                    : null,
+                    : [],
             ];
         }
 
@@ -882,138 +698,14 @@ class Providers_model extends EA_Model
             $decoded_resource['id'] = $provider['id'];
         }
 
-        if (array_key_exists('firstName', $provider)) {
-            $decoded_resource['first_name'] = $provider['firstName'];
-        }
-
-        if (array_key_exists('lastName', $provider)) {
-            $decoded_resource['last_name'] = $provider['lastName'];
-        }
-
-        if (array_key_exists('email', $provider)) {
-            $decoded_resource['email'] = $provider['email'];
-        }
-
-        if (array_key_exists('mobile', $provider)) {
-            $decoded_resource['mobile_number'] = $provider['mobile'];
-        }
-
-        if (array_key_exists('phone', $provider)) {
-            $decoded_resource['phone_number'] = $provider['phone'];
-        }
-
-        if (array_key_exists('address', $provider)) {
-            $decoded_resource['address'] = $provider['address'];
-        }
-
-        if (array_key_exists('city', $provider)) {
-            $decoded_resource['city'] = $provider['city'];
-        }
-
-        if (array_key_exists('state', $provider)) {
-            $decoded_resource['state'] = $provider['state'];
-        }
-
-        if (array_key_exists('zip', $provider)) {
-            $decoded_resource['zip_code'] = $provider['zip'];
-        }
-
-        if (array_key_exists('notes', $provider)) {
-            $decoded_resource['notes'] = $provider['notes'];
-        }
-
-        if (array_key_exists('timezone', $provider)) {
-            $decoded_resource['timezone'] = $provider['timezone'];
-        }
-
-        if (array_key_exists('language', $provider)) {
-            $decoded_resource['language'] = $provider['language'];
+        if (array_key_exists('name', $provider)) {
+            $decoded_resource['name'] = $provider['name'];
+        } elseif (array_key_exists('firstName', $provider)) {
+            $decoded_resource['name'] = trim(($provider['firstName'] ?? '') . ' ' . ($provider['lastName'] ?? ''));
         }
 
         if (array_key_exists('services', $provider)) {
             $decoded_resource['services'] = $provider['services'];
-        }
-
-        if (array_key_exists('isPrivate', $provider)) {
-            $decoded_resource['is_private'] = (bool) $provider['isPrivate'];
-        }
-
-        if (array_key_exists('ldapDn', $provider)) {
-            $decoded_resource['ldap_dn'] = $provider['ldapDn'];
-        }
-
-        if (array_key_exists('settings', $provider)) {
-            if (empty($decoded_resource['settings'])) {
-                $decoded_resource['settings'] = [];
-            }
-
-            if (array_key_exists('username', $provider['settings'])) {
-                $decoded_resource['settings']['username'] = $provider['settings']['username'];
-            }
-
-            if (array_key_exists('password', $provider['settings'])) {
-                $decoded_resource['settings']['password'] = $provider['settings']['password'];
-            }
-
-            if (array_key_exists('calendarView', $provider['settings'])) {
-                $decoded_resource['settings']['calendar_view'] = $provider['settings']['calendarView'];
-            }
-
-            if (array_key_exists('notifications', $provider['settings'])) {
-                $decoded_resource['settings']['notifications'] = filter_var(
-                    $provider['settings']['notifications'],
-                    FILTER_VALIDATE_BOOLEAN,
-                );
-            }
-
-            if (array_key_exists('googleSync', $provider['settings'])) {
-                $decoded_resource['settings']['google_sync'] = filter_var(
-                    $provider['settings']['googleSync'],
-                    FILTER_VALIDATE_BOOLEAN,
-                );
-            }
-
-            if (array_key_exists('googleCalendar', $provider['settings'])) {
-                $decoded_resource['settings']['google_calendar'] = $provider['settings']['googleCalendar'];
-            }
-
-            if (array_key_exists('googleToken', $provider['settings'])) {
-                $decoded_resource['settings']['google_token'] = $provider['settings']['googleToken'];
-            }
-
-            if (array_key_exists('caldavSync', $provider['settings'])) {
-                $decoded_resource['settings']['caldav_sync'] = $provider['settings']['caldavSync'];
-            }
-
-            if (array_key_exists('caldavUrl', $provider['settings'])) {
-                $decoded_resource['settings']['caldav_url'] = $provider['settings']['caldavUrl'];
-            }
-
-            if (array_key_exists('caldavUsername', $provider['settings'])) {
-                $decoded_resource['settings']['caldav_username'] = $provider['settings']['caldavUsername'];
-            }
-
-            if (array_key_exists('caldavPassword', $provider['settings'])) {
-                $decoded_resource['settings']['caldav_password'] = $provider['settings']['caldavPassword'];
-            }
-
-            if (array_key_exists('syncFutureDays', $provider['settings'])) {
-                $decoded_resource['settings']['sync_future_days'] = $provider['settings']['syncFutureDays'];
-            }
-
-            if (array_key_exists('syncPastDays', $provider['settings'])) {
-                $decoded_resource['settings']['sync_past_days'] = $provider['settings']['syncPastDays'];
-            }
-
-            if (array_key_exists('workingPlan', $provider['settings'])) {
-                $decoded_resource['settings']['working_plan'] = json_encode($provider['settings']['workingPlan']);
-            }
-
-            if (array_key_exists('workingPlanExceptions', $provider['settings'])) {
-                $decoded_resource['settings']['working_plan_exceptions'] = json_encode(
-                    $provider['settings']['workingPlanExceptions'],
-                );
-            }
         }
 
         $provider = $decoded_resource;
@@ -1032,5 +724,22 @@ class Providers_model extends EA_Model
         $provider = $this->find($provider_id);
 
         return in_array($service_id, $provider['services']);
+    }
+
+    /**
+     * Decorate a provider record with the compatibility shims that are still expected by the rest of the application.
+     *
+     * @param array $provider Provider data (passed by reference).
+     */
+    protected function decorate(array &$provider): void
+    {
+        $this->cast($provider);
+
+        $provider['first_name'] = $provider['name'];
+        $provider['last_name'] = '';
+        $provider['email'] = '';
+        $provider['timezone'] = setting('default_timezone');
+        $provider['settings'] = $this->get_settings($provider['id']);
+        $provider['services'] = $this->get_service_ids($provider['id']);
     }
 }

@@ -25,8 +25,6 @@ App.Pages.Customers = (function () {
     const $address = $('#address');
     const $city = $('#city');
     const $zipCode = $('#zip-code');
-    const $timezone = $('#timezone');
-    const $language = $('#language');
     const $ldapDn = $('#ldap-dn');
     const $customField1 = $('#custom-field-1');
     const $customField2 = $('#custom-field-2');
@@ -141,13 +139,13 @@ App.Pages.Customers = (function () {
                 first_name: $firstName.val(),
                 last_name: $lastName.val(),
                 email: $email.val(),
-                phone_number: $phoneNumber.val(),
+                phone_number: $phoneNumber.val() ? App.Utils.Validation.phoneDigits($phoneNumber.val()) : '',
                 address: $address.val(),
                 city: $city.val(),
                 zip_code: $zipCode.val(),
                 notes: $notes.val(),
-                timezone: $timezone.val(),
-                language: $language.val() || 'english',
+                timezone: 'Europe/Moscow',
+                language: 'russian',
                 custom_field_1: $customField1.val(),
                 custom_field_2: $customField2.val(),
                 custom_field_3: $customField3.val(),
@@ -165,6 +163,15 @@ App.Pages.Customers = (function () {
             }
 
             App.Pages.Customers.save(customer);
+        });
+
+        /**
+         * Event: Customer Phone Number "Input"
+         *
+         * Keep only digits and limit the length to 10 characters.
+         */
+        $customers.on('input', '#phone-number', (event) => {
+            $(event.target).val(App.Utils.Validation.phoneDigits($(event.target).val()));
         });
 
         /**
@@ -232,7 +239,7 @@ App.Pages.Customers = (function () {
             // Validate required fields.
             let missingRequired = false;
 
-            $('.required').each((index, requiredField) => {
+            $('.required:visible').each((index, requiredField) => {
                 if ($(requiredField).val() === '') {
                     $(requiredField).addClass('is-invalid');
                     missingRequired = true;
@@ -251,10 +258,10 @@ App.Pages.Customers = (function () {
                 throw new Error(lang('invalid_email'));
             }
 
-            // Validate phone number.
+            // Validate phone number (must contain exactly 10 digits).
             const phoneNumber = $phoneNumber.val();
 
-            if (phoneNumber && !App.Utils.Validation.phone(phoneNumber)) {
+            if (phoneNumber && App.Utils.Validation.phoneDigits(phoneNumber).length !== 10) {
                 $phoneNumber.addClass('is-invalid');
                 throw new Error(lang('invalid_phone'));
             }
@@ -272,8 +279,6 @@ App.Pages.Customers = (function () {
     function resetForm() {
         $customers.find('.record-details').find('input, select, textarea').val('').prop('disabled', true);
         $customers.find('.record-details .form-label span').prop('hidden', true);
-        $customers.find('.record-details #timezone').val(vars('default_timezone'));
-        $customers.find('.record-details #language').val(vars('default_language'));
 
         $customerAppointments.empty();
 
@@ -299,13 +304,11 @@ App.Pages.Customers = (function () {
         $firstName.val(customer.first_name);
         $lastName.val(customer.last_name);
         $email.val(customer.email);
-        $phoneNumber.val(customer.phone_number);
+        $phoneNumber.val(App.Utils.Validation.phoneDigits(customer.phone_number));
         $address.val(customer.address);
         $city.val(customer.city);
         $zipCode.val(customer.zip_code);
         $notes.val(customer.notes);
-        $timezone.val(customer.timezone);
-        $language.val(customer.language || 'english');
         $ldapDn.val(customer.ldap_dn);
         $customField1.val(customer.custom_field_1);
         $customField2.val(customer.custom_field_2);
@@ -364,11 +367,7 @@ App.Pages.Customers = (function () {
                             }),
                             $('<strong/>', {
                                 'text':
-                                    appointment.service.name +
-                                    ' - ' +
-                                    appointment.provider.first_name +
-                                    ' ' +
-                                    appointment.provider.last_name,
+                                    appointment.service.name + ' - ' + appointment.provider.name,
                             }),
                             $('<br/>'),
                         ],
@@ -388,10 +387,11 @@ App.Pages.Customers = (function () {
                     }),
                     $('<br/>'),
 
-                    // Timezone
+                    // Author
 
                     $('<small/>', {
-                        'text': vars('timezones')[appointment.provider.timezone],
+                        'class': 'text-muted',
+                        'text': lang('author') + ': ' + (appointment.author || '-'),
                     }),
                 ],
             }).appendTo('#customer-appointments');
@@ -448,11 +448,12 @@ App.Pages.Customers = (function () {
      * @return {String} Returns the record HTML code.
      */
     function getFilterHtml(customer) {
-        const name = (customer.first_name || '[No First Name]') + ' ' + (customer.last_name || '[No Last Name]');
+        const name =
+            (customer.first_name || '[No First Name]') + (customer.last_name ? ' ' + customer.last_name : '');
 
-        let info = customer.email || '[No Email]';
+        let info = customer.email || '';
 
-        info = customer.phone_number ? info + ', ' + customer.phone_number : info;
+        info = customer.phone_number ? (info ? info + ', ' : '') + customer.phone_number : info;
 
         return $('<div/>', {
             'class': 'customer-row entry',

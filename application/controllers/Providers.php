@@ -22,41 +22,12 @@ class Providers extends EA_Controller
 {
     public array $allowed_provider_fields = [
         'id',
-        'first_name',
-        'last_name',
-        'email',
-        'alt_number',
-        'phone_number',
-        'address',
-        'city',
-        'state',
-        'zip_code',
-        'notes',
-        'timezone',
-        'language',
-        'is_private',
-        'ldap_dn',
-        'id_roles',
-        'settings',
+        'name',
         'services',
     ];
 
     public array $optional_provider_fields = [
         'services' => [],
-    ];
-
-    public array $allowed_provider_setting_fields = [
-        'username',
-        'password',
-        'working_plan',
-        'working_plan_exceptions',
-        'notifications',
-        'calendar_view',
-    ];
-
-    public array $optional_provider_setting_fields = [
-        'working_plan' => null,
-        'working_plan_exceptions' => '{}',
     ];
 
     public array $allowed_service_fields = ['id', 'name'];
@@ -73,10 +44,7 @@ class Providers extends EA_Controller
         $this->load->model('roles_model');
 
         $this->load->library('accounts');
-        $this->load->library('timezones');
         $this->load->library('webhooks_client');
-
-        $this->optional_provider_setting_fields['working_plan'] = setting('company_working_plan');
     }
 
     /**
@@ -114,22 +82,13 @@ class Providers extends EA_Controller
         script_vars([
             'user_id' => $user_id,
             'role_slug' => $role_slug,
-            'company_working_plan' => setting('company_working_plan'),
-            'date_format' => setting('date_format'),
-            'time_format' => setting('time_format'),
-            'first_weekday' => setting('first_weekday'),
-            'min_password_length' => MIN_PASSWORD_LENGTH,
-            'timezones' => $this->timezones->to_array(),
             'services' => $services,
-            'default_language' => setting('default_language'),
-            'default_timezone' => setting('default_timezone'),
         ]);
 
         html_vars([
             'page_title' => lang('providers'),
             'active_menu' => PRIV_USERS,
             'user_display_name' => $this->accounts->get_user_display_name($user_id),
-            'grouped_timezones' => $this->timezones->to_grouped_array(),
             'privileges' => $this->roles_model->get_permissions_by_slug($role_slug),
             'services' => $this->services_model->get(),
         ]);
@@ -188,11 +147,7 @@ class Providers extends EA_Controller
 
             $this->providers_model->only($provider, $this->allowed_provider_fields);
 
-            $this->providers_model->only($provider['settings'], $this->allowed_provider_setting_fields);
-
             $this->providers_model->optional($provider, $this->optional_provider_fields);
-
-            $this->providers_model->optional($provider['settings'], $this->optional_provider_setting_fields);
 
             $provider_id = $this->providers_model->save($provider);
 
@@ -256,11 +211,7 @@ class Providers extends EA_Controller
 
             $this->providers_model->only($provider, $this->allowed_provider_fields);
 
-            $this->providers_model->only($provider['settings'], $this->allowed_provider_setting_fields);
-
             $this->providers_model->optional($provider, $this->optional_provider_fields);
-
-            $this->providers_model->optional($provider['settings'], $this->optional_provider_setting_fields);
 
             $provider_id = $this->providers_model->save($provider);
 

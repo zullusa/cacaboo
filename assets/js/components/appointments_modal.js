@@ -29,17 +29,16 @@ App.Components.AppointmentsModal = (function () {
     const $address = $('#address');
     const $city = $('#city');
     const $zipCode = $('#zip-code');
-    const $language = $('#language');
-    const $timezone = $('#timezone');
     const $customerNotes = $('#customer-notes');
     const $selectCustomer = $('#select-customer');
     const $saveAppointment = $('#save-appointment');
     const $appointmentId = $('#appointment-id');
-    const $appointmentLocation = $('#appointment-location');
-    const $appointmentMeetingLink = $('#appointment-meeting-link');
     const $appointmentStatus = $('#appointment-status');
     const $appointmentColor = $('#appointment-color');
     const $appointmentNotes = $('#appointment-notes');
+    const $carMake = $('#car-make');
+    const $carPlate = $('#car-plate');
+    const $appointmentAuthor = $('#appointment-author');
     const $reloadAppointments = $('#reload-appointments');
     const $selectFilterItem = $('#select-filter-item');
     const $selectService = $('#select-service');
@@ -56,18 +55,17 @@ App.Components.AppointmentsModal = (function () {
     const moment = window.moment;
 
     /**
-     * Update the displayed timezone.
+     * Get the value of a field only if it is rendered in the modal.
+     *
+     * Fields that are hidden through the "display" settings are not rendered, so they
+     * must not be sent to the server (undefined values are dropped by jQuery serialization)
+     * in order to avoid overwriting existing customer data.
+     *
+     * @param {jQuery} $field The field element.
+     * @returns {string|undefined}
      */
-    function updateTimezone() {
-        const providerId = $selectProvider.val();
-
-        const provider = vars('available_providers').find(
-            (availableProvider) => Number(availableProvider.id) === Number(providerId),
-        );
-
-        if (provider && provider.timezone) {
-            $('.provider-timezone').text(vars('timezones')[provider.timezone]);
-        }
+    function getFieldValue($field) {
+        return $field.length ? $field.val() : undefined;
     }
 
     /**
@@ -99,11 +97,11 @@ App.Components.AppointmentsModal = (function () {
                 id_users_provider: $selectProvider.val(),
                 start_datetime: startDatetime,
                 end_datetime: endDatetime,
-                location: $appointmentLocation.val(),
-                meeting_link: $appointmentMeetingLink.val(),
                 color: App.Components.ColorSelection.getColor($appointmentColor),
                 status: $appointmentStatus.val(),
                 notes: $appointmentNotes.val(),
+                car_make: $carMake.val(),
+                car_plate: $carPlate.val(),
                 is_unavailability: Number(false),
             };
 
@@ -113,21 +111,24 @@ App.Components.AppointmentsModal = (function () {
             }
 
             const customer = {
-                first_name: $firstName.val(),
-                last_name: $lastName.val(),
-                email: $email.val(),
-                phone_number: $phoneNumber.val(),
-                address: $address.val(),
-                city: $city.val(),
-                zip_code: $zipCode.val(),
-                language: $language.val(),
-                timezone: $timezone.val(),
-                notes: $customerNotes.val(),
-                custom_field_1: $customField1.val(),
-                custom_field_2: $customField2.val(),
-                custom_field_3: $customField3.val(),
-                custom_field_4: $customField4.val(),
-                custom_field_5: $customField5.val(),
+                first_name: getFieldValue($firstName),
+                last_name: getFieldValue($lastName),
+                email: getFieldValue($email),
+                phone_number:
+                    $phoneNumber.length && $phoneNumber.val()
+                        ? App.Utils.Validation.phoneDigits($phoneNumber.val())
+                        : undefined,
+                address: getFieldValue($address),
+                city: getFieldValue($city),
+                zip_code: getFieldValue($zipCode),
+                language: 'russian',
+                timezone: 'Europe/Moscow',
+                notes: getFieldValue($customerNotes),
+                custom_field_1: getFieldValue($customField1),
+                custom_field_2: getFieldValue($customField2),
+                custom_field_3: getFieldValue($customField3),
+                custom_field_4: getFieldValue($customField4),
+                custom_field_5: getFieldValue($customField5),
             };
 
             if ($customerId.val() !== '') {
@@ -154,74 +155,14 @@ App.Components.AppointmentsModal = (function () {
                 $appointmentsModal.find('.modal-body').scrollTop(0);
             };
 
-            // Check if this is an update (appointment has an ID)
-            const isUpdate = Boolean(appointment.id);
-
-            if (isUpdate) {
-                // Show confirmation dialog for notification preference
-                App.Utils.Message.show(lang('appointment_update'), lang('notify_users_on_update_question'), [
-                    {
-                        text: lang('no'),
-                        click: (event, messageModal) => {
-                            messageModal.hide();
-                            App.Http.Calendar.saveAppointmentWithConflictHandling(
-                                appointment,
-                                customer,
-                                successCallback,
-                                errorCallback,
-                                false,
-                            );
-                        },
-                    },
-                    {
-                        text: lang('yes'),
-                        click: (event, messageModal) => {
-                            messageModal.hide();
-                            App.Http.Calendar.saveAppointmentWithConflictHandling(
-                                appointment,
-                                customer,
-                                successCallback,
-                                errorCallback,
-                                true,
-                            );
-                        },
-                    },
-                ]);
-            } else {
-                // New appointment - ask whether to notify users
-                App.Utils.Message.show(
-                    lang('new_appointment_title'),
-                    lang('notify_users_on_create_question'),
-                    [
-                        {
-                            text: lang('no'),
-                            click: (event, messageModal) => {
-                                messageModal.hide();
-                                App.Http.Calendar.saveAppointmentWithConflictHandling(
-                                    appointment,
-                                    customer,
-                                    successCallback,
-                                    errorCallback,
-                                    false,
-                                );
-                            },
-                        },
-                        {
-                            text: lang('yes'),
-                            click: (event, messageModal) => {
-                                messageModal.hide();
-                                App.Http.Calendar.saveAppointmentWithConflictHandling(
-                                    appointment,
-                                    customer,
-                                    successCallback,
-                                    errorCallback,
-                                    true,
-                                );
-                            },
-                        },
-                    ],
-                );
-            }
+            // Save the appointment without notifying the customer.
+            App.Http.Calendar.saveAppointmentWithConflictHandling(
+                appointment,
+                customer,
+                successCallback,
+                errorCallback,
+                false,
+            );
         });
 
         /**
@@ -234,6 +175,9 @@ App.Components.AppointmentsModal = (function () {
             $('.popover').remove();
 
             App.Components.AppointmentsModal.resetModal();
+
+            // Display the name of the current system user as the appointment author (read only).
+            $appointmentAuthor.val(vars('user_display_name') || '');
 
             // Set the selected filter item and find the next appointment time as the default modal values.
             if ($selectFilterItem.find('option:selected').attr('type') === 'provider') {
@@ -300,8 +244,7 @@ App.Components.AppointmentsModal = (function () {
                 vars('customers').forEach((customer) => {
                     $('<div/>', {
                         'data-id': customer.id,
-                        'text':
-                            (customer.first_name || '[No First Name]') + ' ' + (customer.last_name || '[No Last Name]'),
+                        'text': (customer.first_name || '[No First Name]') + (customer.last_name ? ' ' + customer.last_name : ''),
                     }).appendTo($existingCustomersList);
                 });
             } else {
@@ -326,12 +269,10 @@ App.Components.AppointmentsModal = (function () {
                 $firstName.val(customer.first_name);
                 $lastName.val(customer.last_name);
                 $email.val(customer.email);
-                $phoneNumber.val(customer.phone_number);
+                $phoneNumber.val(App.Utils.Validation.phoneDigits(customer.phone_number));
                 $address.val(customer.address);
                 $city.val(customer.city);
                 $zipCode.val(customer.zip_code);
-                $language.val(customer.language);
-                $timezone.val(customer.timezone);
                 $customerNotes.val(customer.notes);
                 $customField1.val(customer.custom_field_1);
                 $customField2.val(customer.custom_field_2);
@@ -369,8 +310,7 @@ App.Components.AppointmentsModal = (function () {
                                 'data-id': customer.id,
                                 'text':
                                     (customer.first_name || '[No First Name]') +
-                                    ' ' +
-                                    (customer.last_name || '[No Last Name]'),
+                                    (customer.last_name ? ' ' + customer.last_name : ''),
                             }).appendTo($existingCustomersList);
 
                             // Verify if this customer is on the old customer list.
@@ -463,7 +403,7 @@ App.Components.AppointmentsModal = (function () {
 
                     // If the current provider is able to provide the selected service, add him to the list box.
                     if (Number(providerServiceId) === Number(serviceId)) {
-                        $selectProvider.append(new Option(provider.first_name + ' ' + provider.last_name, provider.id));
+                        $selectProvider.append(new Option(provider.name, provider.id));
                     }
                 });
 
@@ -471,13 +411,6 @@ App.Components.AppointmentsModal = (function () {
                     $selectProvider.val(providerId);
                 }
             });
-        });
-
-        /**
-         * Event: Provider "Change"
-         */
-        $selectProvider.on('change', () => {
-            updateTimezone();
         });
 
         /**
@@ -492,14 +425,21 @@ App.Components.AppointmentsModal = (function () {
             $address.val('');
             $city.val('');
             $zipCode.val('');
-            $language.val(vars('default_language'));
-            $timezone.val(vars('default_timezone'));
             $customerNotes.val('');
             $customField1.val('');
             $customField2.val('');
             $customField3.val('');
             $customField4.val('');
             $customField5.val('');
+        });
+
+        /**
+         * Event: Customer Phone Number "Input"
+         *
+         * Keep only digits and limit the length to 10 characters.
+         */
+        $appointmentsModal.on('input', '#phone-number', (event) => {
+            $(event.target).val(App.Utils.Validation.phoneDigits($(event.target).val()));
         });
     }
 
@@ -517,9 +457,6 @@ App.Components.AppointmentsModal = (function () {
 
         const defaultStatusValue = $appointmentStatus.find('option:first').val();
         $appointmentStatus.val(defaultStatusValue);
-
-        $language.val(vars('default_language'));
-        $timezone.val(vars('default_timezone'));
 
         // Reset color.
         $appointmentColor.find('.color-selection-option:first').trigger('click');
@@ -540,7 +477,7 @@ App.Components.AppointmentsModal = (function () {
 
             if (canProvideService) {
                 // Add the provider to the list box.
-                $selectProvider.append(new Option(provider.first_name + ' ' + provider.last_name, provider.id));
+                $selectProvider.append(new Option(provider.name, provider.id));
             }
         });
 
@@ -616,6 +553,14 @@ App.Components.AppointmentsModal = (function () {
             ) {
                 $appointmentsModal.find('#email').addClass('is-invalid');
                 throw new Error(lang('invalid_email'));
+            }
+
+            // Check phone number (must contain exactly 10 digits).
+            const phoneInput = $appointmentsModal.find('#phone-number').val();
+
+            if (phoneInput && App.Utils.Validation.phoneDigits(phoneInput).length !== 10) {
+                $appointmentsModal.find('#phone-number').addClass('is-invalid');
+                throw new Error(lang('invalid_phone'));
             }
 
             // Check appointment start and end time.

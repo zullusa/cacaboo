@@ -7,17 +7,17 @@
 ?>
 <div id="footer" class="d-lg-flex justify-content-lg-start align-items-lg-center p-2 text-center text-lg-left mt-auto bg-body border-top" style="font-size: 11px;">
     <div class="mb-3 me-lg-5 mb-lg-0">
-        <img class="me-1" src="<?= base_url('assets/img/logo-16x16.png') ?>" alt="Easy!Appointments Logo">
+        <img class="me-1" src="<?= base_url('assets/img/logo-16x16.png') ?>" alt="CaCaBoo Logo">
 
-        <a href="https://easyappointments.org" target="_blank">Easy!Appointments</a>
+        <a href="https://sto-pitstop.ru" target="_blank">STO Pitstop</a>
 
         <span>v<?= config('version') ?></span>
     </div>
 
     <div class="mb-3 me-lg-5 mb-lg-0">
-        <img class="me-1" src="<?= base_url('assets/img/alextselegidis-logo-16x16.png') ?>" alt="Alex Tselegidis Logo">
+        <img class="me-1" src="<?= base_url('assets/img/logo-16x16.png') ?>" alt="Logo">
 
-        <a href="https://alextselegidis.com" target="_blank">Alex Tselegidis</a>
+        <a href="https://ya-prak.ru/" target="_blank">zilog</a>
 
         &copy; <?= date('Y') ?> - Software Development
     </div>
@@ -34,12 +34,6 @@
             <i class="fas fa-language me-2"></i>
         	<?= ucfirst(config('language')) ?>
         </span>
-    </div>
-
-    <div class="mb-3 me-lg-5 mb-lg-0">
-        <a href="<?= site_url('appointments') ?>">
-            <?= lang('go_to_booking_page') ?>
-        </a>
     </div>
 
     <div class="ms-lg-auto">

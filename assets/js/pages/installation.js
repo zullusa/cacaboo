@@ -27,7 +27,6 @@ App.Pages.Installation = (function () {
     const $username = $('#username');
     const $password = $('#password');
     const $passwordConfirm = $('#password-confirm');
-    const $language = $('#language');
     const $companyName = $('#company-name');
     const $companyEmail = $('#company-email');
     const $companyLink = $('#company-link');
@@ -63,7 +62,7 @@ App.Pages.Installation = (function () {
             dataType: 'json',
         }).done(() => {
             $alert
-                .text('Easy!Appointments has been successfully installed!')
+                .text('CaCaBoo has been successfully installed!')
                 .addClass('alert-success')
                 .prop('hidden', false);
 
@@ -192,7 +191,7 @@ App.Pages.Installation = (function () {
             email: $email.val(),
             username: $username.val(),
             password: $password.val(),
-            language: $language.val(),
+            language: 'russian',
         };
     }
 
@@ -213,7 +212,7 @@ App.Pages.Installation = (function () {
     if (vars('base_url').slice(-1) === '/') {
         App.Utils.Message.show(
             'Invalid Configuration Detected',
-            'Please remove any trailing slashes from your "BASE_URL" setting of the root "config.php" file and try again.',
+            'Please remove any trailing slashes from your "BASE_URL" setting in the ".env" file and try again.',
         );
         $install.prop('disabled', true).fadeTo('0.4');
     }

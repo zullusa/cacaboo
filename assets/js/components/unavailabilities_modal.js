@@ -31,31 +31,9 @@ App.Components.UnavailabilitiesModal = (function () {
     const moment = window.moment;
 
     /**
-     * Update the displayed timezone.
-     */
-    function updateTimezone() {
-        const providerId = $selectProvider.val();
-
-        const provider = vars('available_providers').find(
-            (availableProvider) => Number(availableProvider.id) === Number(providerId),
-        );
-
-        if (provider && provider.timezone) {
-            $unavailabilitiesModal.find('.provider-timezone').text(vars('timezones')[provider.timezone]);
-        }
-    }
-
-    /**
      * Add the component event listeners.
      */
     function addEventListeners() {
-        /**
-         * Event: Provider "Change"
-         */
-        $selectProvider.on('change', () => {
-            updateTimezone();
-        });
-
         /**
          * Event: Manage Unavailability Dialog Save Button "Click"
          *
@@ -204,7 +182,7 @@ App.Components.UnavailabilitiesModal = (function () {
         for (const index in vars('available_providers')) {
             const provider = vars('available_providers')[index];
 
-            $selectProvider.append(new Option(provider.first_name + ' ' + provider.last_name, provider.id));
+            $selectProvider.append(new Option(provider.name, provider.id));
         }
 
         addEventListeners();

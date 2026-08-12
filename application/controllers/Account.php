@@ -123,6 +123,8 @@ class Account extends EA_Controller
 
             $account['id'] = session('user_id');
 
+            $account['timezone'] = 'Europe/Moscow';
+
             $this->users_model->only($account, $this->allowed_user_fields);
 
             $this->users_model->optional($account, $this->optional_user_fields);

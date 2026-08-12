@@ -85,34 +85,25 @@ class Ics_file
             $event->addLocation($location);
         }
 
-        $meeting_link_content = [];
-
-        if (!empty($appointment['meeting_link'])) {
-            $meeting_link_content[] = '';
-            $meeting_link_content[] = lang('meeting_link') . ': ' . $appointment['meeting_link'];
-            $meeting_link_content[] = '';
-        }
-
         $description = [
-            ...$meeting_link_content,
             '',
             lang('provider'),
             '',
-            lang('name') . ': ' . $provider['first_name'] . ' ' . $provider['last_name'],
-            lang('email') . ': ' . $provider['email'],
-            lang('phone_number') . ': ' . $provider['phone_number'],
-            lang('address') . ': ' . $provider['address'],
-            lang('city') . ': ' . $provider['city'],
-            lang('zip_code') . ': ' . $provider['zip_code'],
+            lang('name') . ': ' . ($provider['first_name'] ?? '') . ' ' . ($provider['last_name'] ?? ''),
+            lang('email') . ': ' . ($provider['email'] ?? '-'),
+            lang('phone_number') . ': ' . ($provider['phone_number'] ?? '-'),
+            lang('address') . ': ' . ($provider['address'] ?? '-'),
+            lang('city') . ': ' . ($provider['city'] ?? '-'),
+            lang('zip_code') . ': ' . ($provider['zip_code'] ?? '-'),
             '',
             lang('customer'),
             '',
-            lang('name') . ': ' . $customer['first_name'] . ' ' . $customer['last_name'],
-            lang('email') . ': ' . $customer['email'],
+            lang('name') . ': ' . ($customer['first_name'] ?? '') . ' ' . ($customer['last_name'] ?? ''),
+            lang('email') . ': ' . ($customer['email'] ?? '-'),
             lang('phone_number') . ': ' . ($customer['phone_number'] ?? '-'),
-            lang('address') . ': ' . $customer['address'],
-            lang('city') . ': ' . $customer['city'],
-            lang('zip_code') . ': ' . $customer['zip_code'],
+            lang('address') . ': ' . ($customer['address'] ?? '-'),
+            lang('city') . ': ' . ($customer['city'] ?? '-'),
+            lang('zip_code') . ': ' . ($customer['zip_code'] ?? '-'),
             '',
             lang('notes'),
             '',

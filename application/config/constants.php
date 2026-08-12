@@ -94,7 +94,7 @@ const EVENT_MINIMUM_DURATION = 5; // Minutes
 
 const DEFAULT_COMPANY_COLOR = '#ffffff';
 
-const LDAP_DEFAULT_FILTER = '(&(objectClass=*)(|(cn={{KEYWORD}})(sn={{KEYWORD}})(mail={{KEYWORD}})(givenName={{KEYWORD}})(uid={{KEYWORD}})))';
+const LDAP_DEFAULT_FILTER = '(&(objectCategory=person)(objectClass=user)(|(cn={{KEYWORD}})(sAMAccountName={{KEYWORD}})(sn={{KEYWORD}})(mail={{KEYWORD}})(givenName={{KEYWORD}})))';
 
 const LDAP_WHITELISTED_ATTRIBUTES = [
     'givenname',
@@ -123,7 +123,7 @@ const LDAP_DEFAULT_FIELD_MAPPING = [
     'last_name' => 'sn',
     'email' => 'mail',
     'phone_number' => 'telephonenumber',
-    'username' => 'cn',
+    'username' => 'samaccountname',
 ];
 
 /*
@@ -131,7 +131,7 @@ const LDAP_DEFAULT_FIELD_MAPPING = [
 | Webhook Actions
 |--------------------------------------------------------------------------
 |
-| External application endpoints can subscribe to these webhook actions.  
+| External application endpoints can subscribe to these webhook actions.
 |
 */
 

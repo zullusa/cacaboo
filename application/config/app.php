@@ -11,8 +11,9 @@
 
 $config['version'] = '1.6.0'; // This must be changed manually.
 
-$config['url'] = Config::BASE_URL;
+$config['url'] = getenv('BASE_URL') ?: 'http://localhost';
 
-$config['debug'] = Config::DEBUG_MODE;
+$debug_mode = getenv('DEBUG_MODE');
+$config['debug'] = $debug_mode === false ? false : filter_var($debug_mode, FILTER_VALIDATE_BOOLEAN);
 
-$config['cache_busting_token'] = 'TSJ83';
+$config['cache_busting_token'] = 'TSJ85';

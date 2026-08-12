@@ -14,7 +14,7 @@ Every update follows the same basic process:
 
 Download the new version and replace all the files and folders in your installation directory with the new ones.
 
-- **Keep your `config.php`** — it has your database credentials and settings.
+- **Keep your `.env`** — it has your database credentials and settings.
 - If you've customized any other files, make copies of them first so you don't lose your changes.
 
 ### Step 2: Run Database Migrations
@@ -45,7 +45,7 @@ Some updates have extra steps. Check the sections below for your specific versio
 
 After Steps 1 and 2 above, also:
 
-- Copy your settings from the old `configuration.php` into the new `config.php` file.
+- Copy your settings from the old `configuration.php` file into your `.env` file.
 
 ### Updating from v1.1.x to v1.2.x
 

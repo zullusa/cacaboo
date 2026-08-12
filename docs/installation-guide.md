@@ -36,9 +36,9 @@ chmod -R 755 storage
 
 Or set permissions through your hosting's file manager.
 
-### 4. Edit the Config File
+### 4. Configure the Environment
 
-Open the `config.php` file in the root folder and fill in:
+Copy `.env.example` to `.env` and fill in:
 
 - **BASE_URL** — the URL to your installation (from Step 2)
 - **DB_HOST** — usually `localhost`

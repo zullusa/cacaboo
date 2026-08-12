@@ -22,31 +22,31 @@ class Migration_Add_booking_field_settings extends EA_Migration
             'require' => '1',
         ],
         'last_name' => [
-            'display' => '1',
-            'require' => '1',
+            'display' => '0',
+            'require' => '0',
         ],
         'email' => [
-            'display' => '1',
-            'require' => '1',
+            'display' => '0',
+            'require' => '0',
         ],
         'phone_number' => [
             'display' => '1',
             'require' => '1',
         ],
         'address' => [
-            'display' => '1',
+            'display' => '0',
             'require' => '0',
         ],
         'city' => [
-            'display' => '1',
+            'display' => '0',
             'require' => '0',
         ],
         'zip_code' => [
-            'display' => '1',
+            'display' => '0',
             'require' => '0',
         ],
         'notes' => [
-            'display' => '1',
+            'display' => '0',
             'require' => '0',
         ],
     ];

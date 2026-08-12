@@ -1,6 +1,5 @@
 {
     "presets": [
-        "@babel/preset-env",
-        ["minify", { "builtIns": false, "mangle": false }]
+        "@babel/preset-env"
     ]
 }

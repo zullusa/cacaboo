@@ -192,17 +192,6 @@
                         </select>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label" for="timezone">
-                            <?= lang('timezone') ?>
-                            <span class="text-danger" hidden>*</span>
-                        </label>
-                        <?php component('timezone_dropdown', [
-                            'attributes' => 'id="timezone" class="form-select required" disabled',
-                            'grouped_timezones' => vars('grouped_timezones'),
-                        ]); ?>
-                    </div>
-
                     <?php if (setting('ldap_is_active')): ?>
                         <div class="mb-3">
                             <label for="ldap-dn" class="form-label">

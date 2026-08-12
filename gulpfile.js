@@ -20,6 +20,7 @@ const gulp = require('gulp');
 const plumber = require('gulp-plumber');
 const rename = require('gulp-rename');
 const sass = require('gulp-sass')(require('sass'));
+const terser = require('gulp-terser');
 const zip = require('zip-dir');
 const debug = require('gulp-debug');
 
@@ -56,7 +57,7 @@ function archive(done) {
     fs.copySync('index.php', 'build/index.php');
     fs.copySync('composer.json', 'build/composer.json');
     fs.copySync('composer.lock', 'build/composer.lock');
-    fs.copySync('config-sample.php', 'build/config-sample.php');
+    fs.copySync('.env.example', 'build/.env.example');
     fs.copySync('CHANGELOG.md', 'build/CHANGELOG.md');
     fs.copySync('README.md', 'build/README.md');
     fs.copySync('LICENSE', 'build/LICENSE');
@@ -66,8 +67,8 @@ function archive(done) {
     );
 
     fs.removeSync('build/composer.lock');
-    del.sync('**/.DS_Store');
-    del.sync('build/**/.git');
+    del.deleteSync('**/.DS_Store');
+    del.deleteSync('build/**/.git');
 
     zip('build', {saveTo: filename}, function (error) {
         if (error) {
@@ -90,6 +91,7 @@ function scripts() {
         .pipe(plumber())
         .pipe(changed('assets/js/**/*'))
         .pipe(babel({comments: false}))
+        .pipe(terser({format: {comments: false}}))
         .pipe(rename({suffix: '.min'}))
         .pipe(gulp.dest('assets/js'));
 }
@@ -119,7 +121,7 @@ function watch(done) {
 }
 
 function vendor(done) {
-    del.sync(['assets/vendor/**', '!assets/vendor/index.html']);
+    del.deleteSync(['assets/vendor/**', '!assets/vendor/index.html']);
 
     // bootstrap
     gulp.src([
@@ -155,8 +157,11 @@ function vendor(done) {
         gulp.dest('assets/vendor/jquery-jeditable'),
     );
 
-    // moment
-    gulp.src(['node_modules/moment/min/moment.min.js']).pipe(gulp.dest('assets/vendor/moment'));
+    // moment (with locales build is required by the layouts)
+    gulp.src([
+        'node_modules/moment/min/moment-with-locales.min.js',
+        'node_modules/moment/min/moment-with-locales.min.js.map',
+    ]).pipe(gulp.dest('assets/vendor/moment'));
 
     // moment-timezone
     gulp.src(['node_modules/moment-timezone/builds/moment-timezone-with-data.min.js']).pipe(

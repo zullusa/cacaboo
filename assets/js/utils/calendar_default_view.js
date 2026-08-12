@@ -133,6 +133,54 @@ App.Utils.CalendarDefaultView = (function () {
         return eventData?.workingPlanException !== undefined;
     }
 
+    /**
+     * Get the emoji that matches the given appointment status.
+     *
+     * @param {string} status - Appointment status text.
+     * @returns {string} Emoji for the given status.
+     */
+    function getStatusEmoji(status) {
+        if (!status) {
+            return '📌';
+        }
+
+        const statusEmojis = [
+            {pattern: /подтвержд|подтверден|approved|confirm/i, emoji: '✅'},
+            {pattern: /запис|booked|reserved|scheduled|бронир/i, emoji: '📅'},
+            {pattern: /оповещ|notified|remind/i, emoji: '🔔'},
+            {pattern: /отмен|cancel/i, emoji: '❌'},
+            {pattern: /ожид|pending|waiting|await/i, emoji: '⏳'},
+            {pattern: /не ?яв|no-?show/i, emoji: '🚫'},
+            {pattern: /выполнен|заверш|готов|finished|completed|fulfill|done/i, emoji: '🏁'},
+        ];
+
+        for (const {pattern, emoji} of statusEmojis) {
+            if (pattern.test(status)) {
+                return emoji;
+            }
+        }
+
+        return '📌';
+    }
+
+    /**
+     * Add the appointment status emoji to the bottom-right corner of the event tile.
+     *
+     * @param {Object} info - FullCalendar event info.
+     */
+    function onEventDidMount(info) {
+        const eventData = info.event.extendedProps.data;
+
+        if (isUnavailability(eventData) || !eventData?.status) {
+            return;
+        }
+
+        $('<span/>', {
+            class: 'appointment-status-emoji',
+            text: getStatusEmoji(eventData.status),
+        }).appendTo(info.el);
+    }
+
     // Appointment Modal Helpers
 
     /**
@@ -169,7 +217,6 @@ App.Utils.CalendarDefaultView = (function () {
         $appointmentsModal.find('#city').val(customer.city);
         $appointmentsModal.find('#zip-code').val(customer.zip_code);
         $appointmentsModal.find('#language').val(customer.language);
-        $appointmentsModal.find('#timezone').val(customer.timezone);
         $appointmentsModal.find('#customer-notes').val(customer.notes);
         $appointmentsModal.find('#custom-field-1').val(customer.custom_field_1);
         $appointmentsModal.find('#custom-field-2').val(customer.custom_field_2);
@@ -178,10 +225,11 @@ App.Utils.CalendarDefaultView = (function () {
         $appointmentsModal.find('#custom-field-5').val(customer.custom_field_5);
 
         // Appointment fields
-        $appointmentsModal.find('#appointment-location').val(appointment.location);
-        $appointmentsModal.find('#appointment-meeting-link').val(appointment.meeting_link);
         $appointmentsModal.find('#appointment-status').val(appointment.status);
         $appointmentsModal.find('#appointment-notes').val(appointment.notes);
+        $appointmentsModal.find('#car-make').val(appointment.car_make);
+        $appointmentsModal.find('#car-plate').val(appointment.car_plate);
+        $appointmentsModal.find('#appointment-author').val(appointment.author);
         App.Components.ColorSelection.setColor($appointmentsModal.find('#appointment-color'), appointment.color);
 
         $appointmentsModal.modal('show');
@@ -349,60 +397,9 @@ App.Utils.CalendarDefaultView = (function () {
      * @param {number} appointmentId - Appointment ID to delete.
      */
     function handleDeleteAppointment(appointmentId) {
-        App.Utils.Message.show(
-            lang('delete_appointment_title'),
-            lang('notify_users_on_delete_question'),
-            [
-                {
-                    text: lang('cancel'),
-                    click: (event, notifyModal) => notifyModal.hide(),
-                },
-                {
-                    text: lang('no'),
-                    click: (event, notifyModal) => {
-                        notifyModal.hide();
-                        App.Http.Calendar.deleteAppointment(appointmentId, null, false).done(() => {
-                            $reloadAppointments.trigger('click');
-                        });
-                    },
-                },
-                {
-                    text: lang('yes'),
-                    click: (event, notifyModal) => {
-                        notifyModal.hide();
-
-                        const reasonButtons = [
-                            {
-                                text: lang('cancel'),
-                                click: (event, messageModal) => messageModal.hide(),
-                            },
-                            {
-                                text: lang('delete'),
-                                click: (event, messageModal) => {
-                                    const reason = $('#cancellation-reason').val();
-                                    messageModal.hide();
-                                    App.Http.Calendar.deleteAppointment(appointmentId, reason, true).done(() => {
-                                        $reloadAppointments.trigger('click');
-                                    });
-                                },
-                            },
-                        ];
-
-                        App.Utils.Message.show(
-                            lang('delete_appointment_title'),
-                            lang('write_appointment_removal_reason'),
-                            reasonButtons,
-                        );
-
-                        $('<textarea/>', {
-                            class: 'form-control w-100',
-                            id: 'cancellation-reason',
-                            rows: '3',
-                        }).appendTo('#message-modal .modal-body');
-                    },
-                },
-            ],
-        );
+        App.Http.Calendar.deleteAppointment(appointmentId, null, false).done(() => {
+            $reloadAppointments.trigger('click');
+        });
     }
 
     // Calendar Event Callbacks
@@ -497,12 +494,12 @@ App.Utils.CalendarDefaultView = (function () {
 
         const appointment = prepareAppointmentForSave(eventData);
 
-        const successCallback = (notifyUsers) => {
+        const successCallback = () => {
             const undoFunction = () => {
                 appointment.end_datetime = eventData.end_datetime = moment(appointment.end_datetime)
                     .add({days: -info.endDelta.days, milliseconds: -info.endDelta.milliseconds})
                     .format('YYYY-MM-DD HH:mm:ss');
-                App.Http.Calendar.saveAppointment(appointment, null, null, null, notifyUsers).done(() =>
+                App.Http.Calendar.saveAppointment(appointment, null, null, null, false).done(() =>
                     $notification.hide('blind'),
                 );
                 info.revert();
@@ -515,7 +512,14 @@ App.Utils.CalendarDefaultView = (function () {
             info.event.setProp('data', eventData);
         };
 
-        showNotifyUsersDialog(appointment, successCallback, () => info.revert());
+        App.Http.Calendar.saveAppointmentWithConflictHandling(
+            appointment,
+            null,
+            successCallback,
+            null,
+            false,
+            () => info.revert(),
+        );
     }
 
     /**
@@ -597,7 +601,7 @@ App.Utils.CalendarDefaultView = (function () {
         eventData.start_datetime = appointment.start_datetime;
         eventData.end_datetime = appointment.end_datetime;
 
-        const successCallback = (notifyUsers) => {
+        const successCallback = () => {
             const undoFunction = () => {
                 const delta = {days: -info.delta.days, milliseconds: -info.delta.milliseconds};
 
@@ -607,7 +611,7 @@ App.Utils.CalendarDefaultView = (function () {
                 appointment.end_datetime = moment(appointment.end_datetime).add(delta).format('YYYY-MM-DD HH:mm:ss');
                 eventData.start_datetime = appointment.start_datetime;
                 eventData.end_datetime = appointment.end_datetime;
-                App.Http.Calendar.saveAppointment(appointment, null, null, null, notifyUsers).done(() =>
+                App.Http.Calendar.saveAppointment(appointment, null, null, null, false).done(() =>
                     $notification.hide('blind'),
                 );
                 info.revert();
@@ -617,7 +621,14 @@ App.Utils.CalendarDefaultView = (function () {
             ]);
         };
 
-        showNotifyUsersDialog(appointment, successCallback, () => info.revert());
+        App.Http.Calendar.saveAppointmentWithConflictHandling(
+            appointment,
+            null,
+            successCallback,
+            null,
+            false,
+            () => info.revert(),
+        );
     }
 
     /**
@@ -673,46 +684,6 @@ App.Utils.CalendarDefaultView = (function () {
         delete appointment.provider;
         delete appointment.service;
         return appointment;
-    }
-
-    /**
-     * Show dialog asking whether to notify users.
-     *
-     * @param {Object} appointment - Appointment data.
-     * @param {Function} successCallback - Callback on success.
-     * @param {Function} revertCallback - Callback to revert changes.
-     */
-    function showNotifyUsersDialog(appointment, successCallback, revertCallback) {
-        App.Utils.Message.show(lang('appointment_update'), lang('notify_users_on_update_question'), [
-            {
-                text: lang('no'),
-                click: (event, messageModal) => {
-                    messageModal.hide();
-                    App.Http.Calendar.saveAppointmentWithConflictHandling(
-                        appointment,
-                        null,
-                        () => successCallback(false),
-                        null,
-                        false,
-                        revertCallback,
-                    );
-                },
-            },
-            {
-                text: lang('yes'),
-                click: (event, messageModal) => {
-                    messageModal.hide();
-                    App.Http.Calendar.saveAppointmentWithConflictHandling(
-                        appointment,
-                        null,
-                        () => successCallback(true),
-                        null,
-                        true,
-                        revertCallback,
-                    );
-                },
-            },
-        ]);
     }
 
     /**
@@ -906,12 +877,17 @@ App.Utils.CalendarDefaultView = (function () {
                 .filter(Boolean)
                 .join(' ');
 
-            const type =
-                getSelectedFilterType() !== FILTER_TYPE_SERVICE
-                    ? appointment.service.name
-                    : [appointment.provider.first_name, appointment.provider.last_name].filter(Boolean).join(' ');
+            const phoneNumber = appointment.customer.phone_number ? ' ' + appointment.customer.phone_number : '';
 
-            const title = customerName ? customerName + ' - ' + type : appointment.service.name;
+            const providerName = appointment.provider.name;
+
+            const serviceName = appointment.service.name;
+
+            const notes = appointment.notes ? '\n' + appointment.notes : '';
+
+            const title = customerName
+                ? customerName + phoneNumber + '\n' + providerName + '\n' + serviceName + notes
+                : serviceName;
 
             return {
                 id: appointment.id,
@@ -1211,11 +1187,6 @@ App.Utils.CalendarDefaultView = (function () {
         // Filter change
         $selectFilterItem.on('change', () => {
             const providerId = $selectFilterItem.val();
-            const provider = findProvider(providerId);
-
-            if (provider?.timezone) {
-                $('.provider-timezone').text(vars('timezones')[provider.timezone]);
-            }
 
             $('#insert-working-plan-exception').toggle(isProviderFilter());
             $reloadAppointments.trigger('click');
@@ -1276,7 +1247,7 @@ App.Utils.CalendarDefaultView = (function () {
                         type: FILTER_TYPE_PROVIDER,
                         'google-sync': provider.settings.google_sync,
                         'caldav-sync': provider.settings.caldav_sync,
-                        text: provider.first_name + ' ' + provider.last_name,
+                        text: provider.name,
                     }),
                 ),
             }).appendTo($selectFilterItem);
@@ -1343,6 +1314,7 @@ App.Utils.CalendarDefaultView = (function () {
             eventClick: onEventClick,
             eventResize: onEventResize,
             eventDrop: onEventDrop,
+            eventDidMount: onEventDidMount,
             select: onSelect,
         });
 

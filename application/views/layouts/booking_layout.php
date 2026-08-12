@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#35A768">
     <meta name="google" content="notranslate">
 
-    <meta property="og:title" content="<?= lang('page_title') . ' ' . e(vars('company_name')) ?> | Easy!Appointments"/>
+    <meta property="og:title" content="<?= lang('page_title') . ' ' . e(vars('company_name')) ?> | CaCaBoo"/>
     <meta property="og:description" content="Book Your Appointment With A Few Clicks"/>
     <meta property="og:url" content="<?= base_url() ?>">
     <meta property="og:image" content="<?= base_url('assets/img/social-card.png') ?>"/>
@@ -15,7 +15,7 @@
 
     <?php slot('meta'); ?>
 
-    <title><?= lang('page_title') . ' ' . e(vars('company_name')) ?> | Easy!Appointments</title>
+    <title><?= lang('page_title') . ' ' . e(vars('company_name')) ?> | CaCaBoo</title>
 
     <link rel="icon" type="image/x-icon" href="<?= asset_url('assets/img/favicon.ico') ?>">
     <link rel="icon" sizes="192x192" href="<?= asset_url('assets/img/logo.png') ?>">
@@ -72,7 +72,7 @@
 <script src="<?= asset_url('assets/vendor/cookieconsent/cookieconsent.min.js') ?>"></script>
 <script src="<?= asset_url('assets/vendor/@popperjs-core/popper.min.js') ?>"></script>
 <script src="<?= asset_url('assets/vendor/bootstrap/bootstrap.min.js') ?>"></script>
-<script src="<?= asset_url('assets/vendor/moment/moment.min.js') ?>"></script>
+<script src="<?= asset_url('assets/vendor/moment/moment-with-locales.min.js') ?>"></script>
 <script src="<?= asset_url('assets/vendor/moment-timezone/moment-timezone-with-data.min.js') ?>"></script>
 <script src="<?= asset_url('assets/vendor/@fortawesome-fontawesome-free/fontawesome.min.js') ?>"></script>
 <script src="<?= asset_url('assets/vendor/@fortawesome-fontawesome-free/solid.min.js') ?>"></script>

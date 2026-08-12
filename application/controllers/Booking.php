@@ -308,7 +308,7 @@ class Booking extends EA_Controller
             'customer_data' => $customer,
             'customer_token' => $customer_token,
             'default_language' => setting('default_language'),
-            'default_timezone' => setting('default_timezone'),
+            'default_timezone' => setting('default_timezone', 'Europe/Moscow'),
         ]);
 
         html_vars([
@@ -530,6 +530,9 @@ class Booking extends EA_Controller
 
             // Save customer language (the language which is used to render the booking page).
             $customer['language'] = session('language') ?? config('language');
+
+            // The business always operates in the Moscow timezone (UTC+3).
+            $customer['timezone'] = 'Europe/Moscow';
 
             $this->customers_model->only($customer, $this->allowed_customer_fields);
 

@@ -127,8 +127,8 @@ npm run build
 1. Create a database (or use an existing one)
 2. Upload the `easyappointments` folder to your server
 3. Ensure the `storage` directory is writable
-4. Rename `config-sample.php` to `config.php`
-5. Update configuration values
+4. Copy `.env.example` to `.env`
+5. Update configuration values in `.env`
 6. Open the application in your browser and follow the setup wizard
 
 Once completed, the system is ready to use.

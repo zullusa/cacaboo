@@ -42,8 +42,20 @@ window.App.Utils.Validation = (function () {
         return re.test(value);
     }
 
+    /**
+     * Return only the digits of a phone number, keeping only the last 10 digits.
+     *
+     * @param {String} value
+     *
+     * @return {String}
+     */
+    function phoneDigits(value) {
+        return String(value ?? '').replace(/\D/g, '').slice(-10);
+    }
+
     return {
         email,
         phone,
+        phoneDigits,
     };
 })();

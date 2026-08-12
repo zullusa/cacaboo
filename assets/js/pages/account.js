@@ -27,7 +27,6 @@ App.Pages.Account = (function () {
     const $zipCode = $('#zip-code');
     const $notes = $('#notes');
     const $language = $('#language');
-    const $timezone = $('#timezone');
     const $username = $('#username');
     const $password = $('#password');
     const $retypePassword = $('#retype-password');
@@ -108,7 +107,6 @@ App.Pages.Account = (function () {
         $zipCode.val(account.zip_code);
         $notes.val(account.notes);
         $language.val(account.language);
-        $timezone.val(account.timezone);
         $username.val(account.settings.username);
         $password.val('');
         $retypePassword.val('');
@@ -135,7 +133,7 @@ App.Pages.Account = (function () {
             zip_code: $zipCode.val(),
             notes: $notes.val(),
             language: $language.val(),
-            timezone: $timezone.val(),
+            timezone: 'Europe/Moscow',
             settings: {
                 username: $username.val(),
                 password: $password.val() || undefined,

@@ -23,7 +23,7 @@ This usually happens for one of two reasons:
 
 **1. Wrong config settings**
 
-Open `config.php` and double-check:
+Open the `.env` file and double-check:
 
 - `BASE_URL` is set to your exact installation URL (e.g. `http://your-domain.com/easyappointments`)
 - Your database name, username, and password are correct
@@ -55,11 +55,11 @@ This often happens because the **default working plan includes breaks** that don
 
 ## Installing on a Subdomain Doesn't Show Available Hours
 
-If Easy!Appointments is on a subdomain like `http://book.mysite.com`, make sure `BASE_URL` in `config.php` uses the **subdomain URL** — not the folder path.
+If Easy!Appointments is on a subdomain like `http://book.mysite.com`, make sure `BASE_URL` in `.env` uses the **subdomain URL** — not the folder path.
 
-**Correct:** `BASE_URL = 'http://book.mysite.com'`
+**Correct:** `BASE_URL=http://book.mysite.com`
 
-**Wrong:** `BASE_URL = 'http://mysite.com/book'`
+**Wrong:** `BASE_URL=http://mysite.com/book`
 
 Using the wrong URL causes a browser security error that blocks the booking page from loading appointment hours.
 

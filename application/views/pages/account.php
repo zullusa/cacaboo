@@ -148,16 +148,6 @@
                                     </select>
                                 </div>
 
-                                <div class="mb-3">
-                                    <label class="form-label" for="timezone">
-                                        <?= lang('timezone') ?>
-                                    </label>
-                                    <?php component('timezone_dropdown', [
-                                        'attributes' => 'id="timezone" class="form-select required"',
-                                        'grouped_timezones' => vars('grouped_timezones'),
-                                    ]); ?>
-                                </div>
-
                                 <div>
                                     <label class="form-label mb-3">
                                         <?= lang('options') ?>

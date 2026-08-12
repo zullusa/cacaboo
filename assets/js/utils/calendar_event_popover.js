@@ -174,6 +174,9 @@ App.Utils.CalendarEventPopover = (function () {
      * @returns {Array<jQuery>} Array of jQuery elements.
      */
     function createPopoverRow(labelKey, text) {
+        if (!text || text === '-') {
+            return [];
+        }
         return [
             $('<strong/>', {class: 'd-inline-block me-2', text: lang(labelKey)}),
             $('<span/>', {text: text}),
@@ -203,7 +206,7 @@ App.Utils.CalendarEventPopover = (function () {
         }
         return $('<div/>', {
             html: [
-                ...createPopoverRow('provider', provider.first_name + ' ' + provider.last_name),
+                ...createPopoverRow('provider', provider.name),
                 ...createPopoverRow('start', formatDateTime(startDateTime)),
                 ...createPopoverRow('end', formatDateTime(endDateTime)),
                 ...createPopoverRow('notes', getEventNotes(info.event)),
@@ -241,10 +244,9 @@ App.Utils.CalendarEventPopover = (function () {
 
         return $('<div/>', {
             html: [
-                ...createPopoverRow('provider', provider.first_name + ' ' + provider.last_name),
+                ...createPopoverRow('provider', provider.name),
                 ...createPopoverRow('start', formatTimeOrDash(startTime)),
                 ...createPopoverRow('end', formatTimeOrDash(endTime)),
-                ...createPopoverRow('timezone', startTime ? vars('timezones')[provider.timezone] : '-'),
                 isNonWorking ? $('<p/>', {class: 'mt-2 mb-0 text-muted', text: lang('make_non_working_day')}) : null,
                 renderCustomContent(info),
                 $('<hr/>'),
@@ -266,37 +268,39 @@ App.Utils.CalendarEventPopover = (function () {
         const customer = data.customer;
         const provider = data.provider;
         const customerName = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || '-';
-        const meetingLinkElements = data.meeting_link
-            ? [
-                  $('<strong/>', {class: 'd-inline-block me-2', text: lang('meeting_link')}),
-                  $('<a/>', {href: data.meeting_link, target: '_blank', text: data.meeting_link}),
-                  $('<br/>'),
-              ]
-            : [];
         return $('<div/>', {
             html: [
                 ...createPopoverRow('start', formatDateTime(info.event.start)),
                 ...createPopoverRow('end', formatDateTime(info.event.end)),
-                ...createPopoverRow('timezone', vars('timezones')[provider.timezone]),
                 ...createPopoverRow('status', data.status || '-'),
                 ...createPopoverRow('service', data.service.name),
                 $('<strong/>', {class: 'd-inline-block me-2', text: lang('provider')}),
                 renderMapIcon(provider),
-                $('<span/>', {text: provider.first_name + ' ' + provider.last_name}),
+                $('<span/>', {text: provider.name}),
                 $('<br/>'),
                 $('<strong/>', {class: 'd-inline-block me-2', text: lang('customer')}),
                 renderMapIcon(customer),
                 $('<span/>', {class: 'd-inline-block', text: customerName}),
                 $('<br/>'),
-                $('<strong/>', {class: 'd-inline-block me-2', text: lang('email')}),
-                renderMailIcon(customer.email),
-                $('<span/>', {class: 'd-inline-block', text: customer.email || '-'}),
-                $('<br/>'),
-                $('<strong/>', {class: 'd-inline-block me-2', text: lang('phone')}),
-                renderPhoneIcon(customer.phone_number),
-                $('<span/>', {class: 'd-inline-block', text: customer.phone_number || '-'}),
-                $('<br/>'),
-                ...meetingLinkElements,
+                ...(customer.email
+                    ? [
+                          $('<strong/>', {class: 'd-inline-block me-2', text: lang('email')}),
+                          renderMailIcon(customer.email),
+                          $('<span/>', {class: 'd-inline-block', text: customer.email}),
+                          $('<br/>'),
+                      ]
+                    : []),
+                ...(customer.phone_number
+                    ? [
+                          $('<strong/>', {class: 'd-inline-block me-2', text: lang('phone')}),
+                          renderPhoneIcon(customer.phone_number),
+                          $('<span/>', {class: 'd-inline-block', text: customer.phone_number}),
+                          $('<br/>'),
+                      ]
+                    : []),
+                ...createPopoverRow('car_make', data.car_make),
+                ...createPopoverRow('car_plate', data.car_plate),
+                ...createPopoverRow('author', data.author),
                 ...createPopoverRow('notes', getEventNotes(info.event)),
                 renderCustomContent(info),
                 $('<hr/>'),

@@ -185,7 +185,7 @@ class Console extends EA_Controller
     {
         $help = [
             '',
-            'Easy!Appointments ' . config('version'),
+            'Appointments ' . config('version'),
             '',
             'Usage:',
             '',

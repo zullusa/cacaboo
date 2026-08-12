@@ -51,7 +51,7 @@
 
 require_once __DIR__ . '/../helpers/routes_helper.php';
 
-$route['default_controller'] = 'booking';
+$route['default_controller'] = 'calendar';
 
 $route['404_override'] = '';
 
@@ -181,7 +181,7 @@ route_api_resource($route, 'customers', 'api/v1/');
 
 route_api_resource($route, 'providers', 'api/v1/');
 
-route_api_resource($route, 'secretaries', 'api/v1/');
+// route_api_resource($route, 'secretaries', 'api/v1/');
 
 route_api_resource($route, 'services', 'api/v1/');
 

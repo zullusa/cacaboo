@@ -66,13 +66,14 @@ class Notifications
 
             $customer_link = site_url('booking/reschedule/' . $appointment['hash']);
 
-            $provider_link = site_url('calendar/reschedule/' . $appointment['hash']);
-
             $ics_stream = $this->CI->ics_file->get_stream($appointment, $service, $provider, $customer);
 
             // Notify customer.
             $send_customer =
-                !empty($customer['email']) && filter_var(setting('customer_notifications'), FILTER_VALIDATE_BOOLEAN);
+                (!empty($customer['email']) ||
+                    !empty($customer['phone_number']) ||
+                    !empty($customer['mobile_number'])) &&
+                filter_var(setting('customer_notifications'), FILTER_VALIDATE_BOOLEAN);
 
             if ($send_customer === true) {
                 config(['language' => $customer['language']]);
@@ -93,108 +94,10 @@ class Notifications
                         $customer['email'],
                         $ics_stream,
                         $customer['timezone'],
+                        $this->get_recipient_phone($customer),
                     );
                 } catch (Throwable $e) {
                     $this->log_exception($e, 'appointment-saved to customer', $appointment['id'] ?? null);
-                }
-            }
-
-            // Notify provider.
-            $send_provider = filter_var(
-                $this->CI->providers_model->get_setting($provider['id'], 'notifications'),
-                FILTER_VALIDATE_BOOLEAN,
-            );
-
-            if ($send_provider === true) {
-                config(['language' => $provider['language']]);
-                $this->CI->lang->load('translations');
-                $subject = $manage_mode ? lang('appointment_details_changed') : lang('appointment_added_to_your_plan');
-                $message = $manage_mode ? '' : lang('appointment_link_description');
-
-                try {
-                    $this->CI->email_messages->send_appointment_saved(
-                        $appointment,
-                        $provider,
-                        $service,
-                        $customer,
-                        $settings,
-                        $subject,
-                        $message,
-                        $provider_link,
-                        $provider['email'],
-                        $ics_stream,
-                        $provider['timezone'],
-                    );
-                } catch (Throwable $e) {
-                    $this->log_exception($e, 'appointment-saved to provider', $appointment['id'] ?? null);
-                }
-            }
-
-            // Notify admins.
-            $admins = $this->CI->admins_model->get();
-
-            foreach ($admins as $admin) {
-                if ($admin['settings']['notifications'] === '0') {
-                    continue;
-                }
-
-                config(['language' => $admin['language']]);
-                $this->CI->lang->load('translations');
-                $subject = $manage_mode ? lang('appointment_details_changed') : lang('appointment_added_to_your_plan');
-                $message = $manage_mode ? '' : lang('appointment_link_description');
-
-                try {
-                    $this->CI->email_messages->send_appointment_saved(
-                        $appointment,
-                        $provider,
-                        $service,
-                        $customer,
-                        $settings,
-                        $subject,
-                        $message,
-                        $provider_link,
-                        $admin['email'],
-                        $ics_stream,
-                        $admin['timezone'],
-                    );
-                } catch (Throwable $e) {
-                    $this->log_exception($e, 'appointment-saved to admin', $appointment['id'] ?? null);
-                }
-            }
-
-            // Notify secretaries.
-            $secretaries = $this->CI->secretaries_model->get();
-
-            foreach ($secretaries as $secretary) {
-                if ($secretary['settings']['notifications'] === '0') {
-                    continue;
-                }
-
-                if (!in_array($provider['id'], $secretary['providers'])) {
-                    continue;
-                }
-
-                config(['language' => $secretary['language']]);
-                $this->CI->lang->load('translations');
-                $subject = $manage_mode ? lang('appointment_details_changed') : lang('appointment_added_to_your_plan');
-                $message = $manage_mode ? '' : lang('appointment_link_description');
-
-                try {
-                    $this->CI->email_messages->send_appointment_saved(
-                        $appointment,
-                        $provider,
-                        $service,
-                        $customer,
-                        $settings,
-                        $subject,
-                        $message,
-                        $provider_link,
-                        $secretary['email'],
-                        $ics_stream,
-                        $secretary['timezone'],
-                    );
-                } catch (Throwable $e) {
-                    $this->log_exception($e, 'appointment-saved to secretary', $appointment['id'] ?? null);
                 }
             }
         } catch (Throwable $e) {
@@ -225,35 +128,12 @@ class Notifications
         try {
             $current_language = config('language');
 
-            // Notify provider.
-            $send_provider = filter_var(
-                $this->CI->providers_model->get_setting($provider['id'], 'notifications'),
-                FILTER_VALIDATE_BOOLEAN,
-            );
-
-            if ($send_provider === true) {
-                config(['language' => $provider['language']]);
-                $this->CI->lang->load('translations');
-
-                try {
-                    $this->CI->email_messages->send_appointment_deleted(
-                        $appointment,
-                        $provider,
-                        $service,
-                        $customer,
-                        $settings,
-                        $provider['email'],
-                        $cancellation_reason,
-                        $provider['timezone'],
-                    );
-                } catch (Throwable $e) {
-                    $this->log_exception($e, 'appointment-deleted to provider', $appointment['id'] ?? null);
-                }
-            }
-
             // Notify customer.
             $send_customer =
-                !empty($customer['email']) && filter_var(setting('customer_notifications'), FILTER_VALIDATE_BOOLEAN);
+                (!empty($customer['email']) ||
+                    !empty($customer['phone_number']) ||
+                    !empty($customer['mobile_number'])) &&
+                filter_var(setting('customer_notifications'), FILTER_VALIDATE_BOOLEAN);
 
             if ($send_customer === true) {
                 config(['language' => $customer['language']]);
@@ -269,67 +149,10 @@ class Notifications
                         $customer['email'],
                         $cancellation_reason,
                         $customer['timezone'],
+                        $this->get_recipient_phone($customer),
                     );
                 } catch (Throwable $e) {
                     $this->log_exception($e, 'appointment-deleted to customer', $appointment['id'] ?? null);
-                }
-            }
-
-            // Notify admins.
-            $admins = $this->CI->admins_model->get();
-
-            foreach ($admins as $admin) {
-                if ($admin['settings']['notifications'] === '0') {
-                    continue;
-                }
-
-                config(['language' => $admin['language']]);
-                $this->CI->lang->load('translations');
-
-                try {
-                    $this->CI->email_messages->send_appointment_deleted(
-                        $appointment,
-                        $provider,
-                        $service,
-                        $customer,
-                        $settings,
-                        $admin['email'],
-                        $cancellation_reason,
-                        $admin['timezone'],
-                    );
-                } catch (Throwable $e) {
-                    $this->log_exception($e, 'appointment-deleted to admin', $appointment['id'] ?? null);
-                }
-            }
-
-            // Notify secretaries.
-            $secretaries = $this->CI->secretaries_model->get();
-
-            foreach ($secretaries as $secretary) {
-                if ($secretary['settings']['notifications'] === '0') {
-                    continue;
-                }
-
-                if (!in_array($provider['id'], $secretary['providers'])) {
-                    continue;
-                }
-
-                config(['language' => $secretary['language']]);
-                $this->CI->lang->load('translations');
-
-                try {
-                    $this->CI->email_messages->send_appointment_deleted(
-                        $appointment,
-                        $provider,
-                        $service,
-                        $customer,
-                        $settings,
-                        $secretary['email'],
-                        $cancellation_reason,
-                        $secretary['timezone'],
-                    );
-                } catch (Throwable $e) {
-                    $this->log_exception($e, 'appointment-deleted to secretary', $appointment['id'] ?? null);
                 }
             }
         } catch (Throwable $e) {
@@ -345,6 +168,11 @@ class Notifications
             config(['language' => $current_language ?? 'english']);
             $this->CI->lang->load('translations');
         }
+    }
+
+    private function get_recipient_phone(array $recipient): ?string
+    {
+        return !empty($recipient['phone_number']) ? $recipient['phone_number'] : ($recipient['mobile_number'] ?? null);
     }
 
     private function log_exception(Throwable $e, string $message, ?int $appointment_id): void

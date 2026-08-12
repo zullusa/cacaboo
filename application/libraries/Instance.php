@@ -113,34 +113,33 @@ class Instance
 
         // Service
 
-        $service_id = $this->CI->services_model->save([
-            'name' => 'Service',
-            'duration' => '30',
+        $service_work_id = $this->CI->services_model->save([
+            'name' => 'В РАБОТУ',
+            'duration' => '60',
             'price' => '0',
             'currency' => '',
-            'slot_interval' => 15,
+            'slot_interval' => 120,
+            'color' => '#abe9a4',
             'attendants_number' => '1',
+            'is_private' => '0',
+        ]);
+
+        $service_first_id = $this->CI->services_model->save([
+            'name' => 'ПЕРВИЧКА',
+            'duration' => '60',
+            'price' => '0',
+            'currency' => '',
+            'slot_interval' => 120,
+            'color' => '#ebe07c',
+            'attendants_number' => '1',
+            'is_private' => '0',
         ]);
 
         // Provider
 
         $this->CI->providers_model->save([
-            'first_name' => 'Jane',
-            'last_name' => 'Doe',
-            'email' => 'jane@example.org',
-            'phone_number' => '+10000000000',
-            'services' => [$service_id],
-            'settings' => [
-                'username' => 'janedoe',
-                'password' => random_string(),
-                'working_plan' => setting('company_working_plan'),
-                'working_plan_exceptions' => '{}',
-                'notifications' => true,
-                'google_sync' => false,
-                'sync_past_days' => 30,
-                'sync_future_days' => 90,
-                'calendar_view' => CALENDAR_VIEW_DEFAULT,
-            ],
+            'name' => 'STO',
+            'services' => [$service_work_id, $service_first_id],
         ]);
 
         // Customer

@@ -28,7 +28,6 @@ App.Pages.Secretaries = (function () {
     const $zipCode = $('#zip-code');
     const $notes = $('#notes');
     const $language = $('#language');
-    const $timezone = $('#timezone');
     const $ldapDn = $('#ldap-dn');
     const $username = $('#username');
     const $password = $('#password');
@@ -208,7 +207,7 @@ App.Pages.Secretaries = (function () {
                 zip_code: $zipCode.val(),
                 notes: $notes.val(),
                 language: $language.val(),
-                timezone: $timezone.val(),
+                timezone: vars('default_timezone'),
                 ldap_dn: $ldapDn.val(),
                 settings: {
                     username: $username.val(),
@@ -381,7 +380,6 @@ App.Pages.Secretaries = (function () {
         $secretaries.find('.record-details').find('input, select, textarea').val('').prop('disabled', true);
         $secretaries.find('.record-details .form-label span').prop('hidden', true);
         $secretaries.find('.record-details #calendar-view').val('default');
-        $secretaries.find('.record-details #timezone').val(vars('default_timezone'));
         $secretaries.find('.record-details #language').val(vars('default_language'));
         $secretaries.find('.record-details #notifications').prop('checked', true);
         $secretaries.find('.add-edit-delete-group').show();
@@ -411,7 +409,6 @@ App.Pages.Secretaries = (function () {
         $zipCode.val(secretary.zip_code);
         $notes.val(secretary.notes);
         $language.val(secretary.language);
-        $timezone.val(secretary.timezone);
         $ldapDn.val(secretary.ldap_dn);
 
         $username.val(secretary.settings.username);
@@ -558,7 +555,7 @@ App.Pages.Secretaries = (function () {
                             }),
                             $('<label/>', {
                                 'class': 'form-check-label',
-                                'text': provider.first_name + ' ' + provider.last_name,
+                                'text': provider.name,
                                 'for': checkboxId,
                             }),
                         ],

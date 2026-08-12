@@ -129,18 +129,6 @@ class Providers_api_v1 extends EA_Controller
                 throw new InvalidArgumentException('No services property provided.');
             }
 
-            if (!array_key_exists('settings', $provider)) {
-                throw new InvalidArgumentException('No settings property provided.');
-            }
-
-            if (!array_key_exists('working_plan', $provider['settings'])) {
-                $provider['settings']['working_plan'] = setting('company_working_plan');
-            }
-
-            if (!array_key_exists('working_plan_exceptions', $provider['settings'])) {
-                $provider['settings']['working_plan_exceptions'] = '{}';
-            }
-
             $provider_id = $this->providers_model->save($provider);
 
             $created_provider = $this->providers_model->find($provider_id);

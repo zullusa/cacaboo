@@ -12,7 +12,7 @@
         <img src="<?= base_url(
             'assets/img/logo.png',
         ) ?>" alt="logo" class="float-start me-2" style="width: 45px; height: 45px;">
-        <h6 class="mb-1 mt-1 fw-bold text-white" style="font-size: 15px;">EASY!APPOINTMENTS</h6>
+        <h6 class="mb-1 mt-1 fw-bold text-white" style="font-size: 15px;">CACABOO</h6>
         <small class="d-block text-white-50" style="font-size: 12px;">Online Appointment Scheduler</small>
     </div>
 
@@ -66,22 +66,11 @@
             <?php $hidden = can('view', PRIV_USERS) ? '' : 'd-none'; ?>
             <?php $active = $active_menu == PRIV_USERS ? 'active' : ''; ?>
             <li class="nav-item dropdown text-center <?= $active . $hidden ?>" style="min-width: 100px;">
-                <a class="nav-link dropdown-toggle text-white fw-light py-3 px-3" href="#" data-bs-toggle="dropdown"
+                <a href="<?= site_url('admins')  ?>" class="nav-link text-white fw-light py-3 px-3"
                    data-tippy-content="<?= lang('manage_users_hint') ?>">
                     <i class="fas fa-users me-2"></i>
-                    <?= lang('users') ?>
+                    <?= lang('admins') ?>
                 </a>
-                <div class="dropdown-menu dropdown-menu-end">
-                    <a class="dropdown-item" href="<?= site_url('providers') ?>">
-                        <?= lang('providers') ?>
-                    </a>
-                    <a class="dropdown-item" href="<?= site_url('secretaries') ?>">
-                        <?= lang('secretaries') ?>
-                    </a>
-                    <a class="dropdown-item" href="<?= site_url('admins') ?>">
-                        <?= lang('admins') ?>
-                    </a>
-                </div>
             </li>
 
             <?php $hidden = can('view', PRIV_SYSTEM_SETTINGS) || can('view', PRIV_USER_SETTINGS) ? '' : 'd-none'; ?>
@@ -108,16 +97,7 @@
                         <i class="fas fa-info-circle me-2"></i>
                         <?= lang('about') ?>
                     </a>
-                    <a class="dropdown-item text-danger" href="https://easyappointments.org/premium" target="_blank">
-                        <i class="fas fa-crown text-warning me-2"></i>
-                        Premium
-                    </a>
-                    <div class="dropdown-divider"></div>
-                    <a class="dropdown-item" href="<?= site_url('booking') ?>" target="_blank">
-                        <i class="fas fa-external-link me-2"></i>
-                        <?= lang('booking') ?>
-                    </a>
-                    <div class="dropdown-divider"></div>
+                    
                     <a class="dropdown-item" href="<?= site_url('logout') ?>">
                         <i class="fas fa-sign-out me-2"></i>
                         <?= lang('log_out') ?>

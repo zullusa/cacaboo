@@ -95,7 +95,7 @@ class Admins extends EA_Controller
             'timezones' => $this->timezones->to_array(),
             'min_password_length' => MIN_PASSWORD_LENGTH,
             'default_language' => setting('default_language'),
-            'default_timezone' => setting('default_timezone'),
+            'default_timezone' => setting('default_timezone', 'Europe/Moscow'),
         ]);
 
         html_vars([

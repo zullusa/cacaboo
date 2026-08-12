@@ -4,9 +4,32 @@ services:
     working_dir: /var/www/html
     extra_hosts:
       - host.docker.internal:host-gateway
+    environment:
+      - BASE_URL=${BASE_URL}
+      - LANGUAGE=${DEFAULT_LANGUAGE}
+      - DEBUG_MODE=${DEBUG_MODE}
+      - APP_ENV=${APP_ENV}
+      - DB_HOST=${DB_HOST}
+      - DB_NAME=${MYSQL_DATABASE}
+      - DB_USERNAME=${MYSQL_USER}
+      - DB_PASSWORD=${MYSQL_PASSWORD}
+      - RABBITMQ_ENABLED=${RABBITMQ_ENABLED}
+      - RABBITMQ_HOST=${RABBITMQ_HOST}
+      - RABBITMQ_PORT=${RABBITMQ_PORT}
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - RABBITMQ_VHOST=${RABBITMQ_VHOST}
+      - RABBITMQ_QUEUE=${RABBITMQ_QUEUE:-notifications_dev}
+      - RABBITMQ_EXCHANGE=${RABBITMQ_EXCHANGE}
+      - RABBITMQ_ROUTING_KEY=${RABBITMQ_ROUTING_KEY}
+      - GOOGLE_SYNC_FEATURE=${GOOGLE_SYNC_FEATURE}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
     volumes:
       - '.:/var/www/html'
       - './docker/php-fpm/php-ini-overrides.ini:/usr/local/etc/php/conf.d/99-overrides.ini'
+    depends_on:
+      - mysql
 
   nginx:
     image: 'nginx:1.23.3-alpine'
@@ -16,32 +39,112 @@ services:
       - './docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf'
     ports:
       - '${NGINX_PORT:-80}:80'
+    depends_on:
+      - php-fpm
 
   mysql:
     image: 'mysql:8.0'
     volumes:
       - './docker/mysql:/var/lib/mysql'
     environment:
-      - MYSQL_ROOT_PASSWORD=secret
-      - MYSQL_DATABASE=easyappointments
-      - MYSQL_USER=user
-      - MYSQL_PASSWORD=password
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
     ports:
       - '${MYSQL_PORT:-3306}:3306'
 
   phpmyadmin:
     image: 'phpmyadmin:5.2.1'
     ports:
-      - '${PHPMYADMIN_PORT:-8080}:80'
+      - '${PHPMYADMIN_PORT:-8088}:80'
     environment:
       - 'PMA_HOST=mysql'
       - 'UPLOAD_LIMIT=102400K'
+    depends_on:
+      - mysql
 
   mailpit:
     image: 'axllent/mailpit:v1.7'
     ports:
       - '${MAILPIT_HTTP_PORT:-8025}:8025'
       - '${MAILPIT_SMTP_PORT:-1025}:1025'
+
+  # rabbitmq:
+  #   image: 'rabbitmq:3-management'
+  #   ports:
+  #     - '${RABBITMQ_PORT:-5672}:5672'
+  #     - '${RABBITMQ_MANAGEMENT_PORT:-15672}:15672'
+  #   environment:
+  #     - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+  #     - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+  #     - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_VHOST}
+
+  reminder-worker:
+    build: docker/reminder-worker
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=3306
+      - DB_NAME=${MYSQL_DATABASE}
+      - DB_USERNAME=${MYSQL_USER}
+      - DB_PASSWORD=${MYSQL_PASSWORD}
+      - DB_PREFIX=${DB_PREFIX}
+      - RABBITMQ_HOST=${RABBITMQ_HOST}
+      - RABBITMQ_PORT=${RABBITMQ_PORT}
+      - RABBITMQ_USERNAME=${RABBITMQ_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - RABBITMQ_VHOST=${RABBITMQ_VHOST}
+      - RABBITMQ_QUEUE=${RABBITMQ_QUEUE:-notifications_dev}
+      - RABBITMQ_EXCHANGE=${RABBITMQ_EXCHANGE}
+      - RABBITMQ_ROUTING_KEY=${RABBITMQ_ROUTING_KEY}
+      - RABBITMQ_NOTIFIED_QUEUE=${RABBITMQ_NOTIFIED_QUEUE:-notified_dev}
+      - RABBITMQ_NOTIFIED_EXCHANGE=${RABBITMQ_NOTIFIED_EXCHANGE:-notified_exchange_dev}
+      - RABBITMQ_NOTIFIED_ROUTING_KEY=${RABBITMQ_NOTIFIED_ROUTING_KEY:-notified_dev}
+      - RABBITMQ_HEARTBEAT=${RABBITMQ_HEARTBEAT:-60}
+      - TIMEZONE=${WORKER_TIMEZONE}
+      - POLL_INTERVAL=${WORKER_POLL_INTERVAL}
+      - REMINDER_OFFSETS=${WORKER_REMINDER_OFFSETS}
+      - TOLERANCE_SECONDS=${WORKER_TOLERANCE_SECONDS}
+      - REMINDER_TYPE=${WORKER_TYPE}
+      - REMINDER_SUBJECT=${WORKER_SUBJECT}
+      - REMINDER_STATUS_NOTIFIED=${REMINDER_STATUS_NOTIFIED:-Оповещен}
+      - REMINDER_PHONE_PREFIX=${REMINDER_PHONE_PREFIX:-+7}
+      - ADDRESS=${ADDRESS}
+      - CONTACT_PHONE=${CONTACT_PHONE}
+    depends_on:
+      - mysql
+    restart: unless-stopped
+
+  sms-service:
+    build: sms-service
+    environment:
+      - MODEM_NAME=${MODEM_NAME:-UsbQmi0}
+      - MODEM_USER=${MODEM_USER:-samsa}
+      - MODEM_PASSWORD=${MODEM_PASSWORD:-samsa}
+      - MODEM_URL_BASE=${MODEM_URL_BASE:-http://192.168.0.1}
+      - RABBITMQ_HOST=${RABBITMQ_HOST}
+      - RABBITMQ_PORT=${RABBITMQ_PORT}
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - RABBITMQ_VHOST=${RABBITMQ_VHOST}
+      - RABBITMQ_QUEUE=${RABBITMQ_QUEUE:-notifications}
+      - RABBITMQ_EXCHANGE=${RABBITMQ_EXCHANGE}
+      - RABBITMQ_ROUTING_KEY=${RABBITMQ_ROUTING_KEY}
+      - RABBITMQ_NOTIFIED_QUEUE=${RABBITMQ_NOTIFIED_QUEUE:-notified_dev}
+      - RABBITMQ_NOTIFIED_EXCHANGE=${RABBITMQ_NOTIFIED_EXCHANGE:-notified_exchange_dev}
+      - RABBITMQ_NOTIFIED_ROUTING_KEY=${RABBITMQ_NOTIFIED_ROUTING_KEY:-notified_dev}
+    depends_on:
+      - mysql
+    restart: unless-stopped
+
+  keenetic-mock:
+    build: docker/keenetic-mock
+    ports:
+      - '${KEENETIC_MOCK_PORT:-18080}:8080'
+    environment:
+      - MODEM_USER=${MODEM_USER:-samsa}
+      - MODEM_PASSWORD=${MODEM_PASSWORD:-samsa}
+    restart: unless-stopped
 
   swagger-ui:
     platform: linux/amd64
@@ -52,7 +155,9 @@ services:
       - ./openapi.yml:/usr/share/nginx/html/openapi.yml
     environment:
       API_URL: openapi.yml
-  
+    depends_on:
+      - php-fpm
+
   baikal:
     image: ckulka/baikal:0.10.1-apache
     ports:
@@ -61,7 +166,7 @@ services:
       - ./docker/baikal:/var/www/html
       - ./docker/baikal/config:/var/www/baikal/config
       - ./docker/baikal/data:/var/www/baikal/Specific
-  
+
   openldap:
     image: osixia/openldap:1.5.0
     hostname: openldap
@@ -93,4 +198,3 @@ services:
       - PHPLDAPADMIN_HTTPS=false
     depends_on:
       - openldap
-

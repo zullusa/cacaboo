@@ -14,8 +14,11 @@
 |
 */
 
-$config['google_sync_feature'] = defined('Config::GOOGLE_SYNC_FEATURE') ? Config::GOOGLE_SYNC_FEATURE : false;
+$google_sync_feature = getenv('GOOGLE_SYNC_FEATURE');
+$config['google_sync_feature'] = $google_sync_feature === false
+    ? false
+    : filter_var($google_sync_feature, FILTER_VALIDATE_BOOLEAN);
 
-$config['google_client_id'] = defined('Config::GOOGLE_CLIENT_ID') ? Config::GOOGLE_CLIENT_ID : '';
+$config['google_client_id'] = getenv('GOOGLE_CLIENT_ID') ?: '';
 
-$config['google_client_secret'] = defined('Config::GOOGLE_CLIENT_SECRET') ? Config::GOOGLE_CLIENT_SECRET : '';
+$config['google_client_secret'] = getenv('GOOGLE_CLIENT_SECRET') ?: '';

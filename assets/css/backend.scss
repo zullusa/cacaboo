@@ -198,6 +198,22 @@ body .modal.full-screen .modal-push {
     font-size: 11px;
 }
 
+#calendar .fc-timegrid-event,
+#calendar .fc-daygrid-event {
+    position: relative;
+}
+
+#calendar .fc-event .appointment-status-emoji {
+    position: absolute;
+    right: 3px;
+    bottom: 2px;
+    font-size: 12px;
+    line-height: 1;
+    z-index: 1;
+    pointer-events: none;
+    text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+}
+
 #calendar-page #calendar .fc-unavailability {
     background-image: url('../img/unavailability.jpg');
     background-blend-mode: hard-light;
@@ -245,6 +261,7 @@ body .modal.full-screen .modal-push {
 #calendar-page .fc-event-title {
     font-weight: normal;
     font-size: 11px;
+    white-space: pre-line;
 }
 
 #calendar-page .fc-timegrid-axis-cushion,

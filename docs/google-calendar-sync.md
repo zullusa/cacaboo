@@ -28,12 +28,12 @@ You need to tell Google that your Easy!Appointments installation is allowed to a
 
 You can now configure the Google **Client ID** and **Client Secret** directly from the Easy!Appointments user interface (Backend **Settings** → **Google Calendar** section).
 
-As an alternative, you can still define them in `config.php`:
+As an alternative, you can still define them in `.env`:
 
-```php
-const GOOGLE_SYNC_FEATURE   = TRUE;
-const GOOGLE_CLIENT_ID      = 'your-client-id-here';
-const GOOGLE_CLIENT_SECRET  = 'your-client-secret-here';
+```dotenv
+GOOGLE_SYNC_FEATURE=true
+GOOGLE_CLIENT_ID=your-client-id-here
+GOOGLE_CLIENT_SECRET=your-client-secret-here
 ```
 
 ## Step 3: Link a Provider's Google Calendar

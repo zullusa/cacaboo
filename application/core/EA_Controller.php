@@ -66,6 +66,7 @@
  * @property Ldap_client $ldap_client
  * @property Notifications $notifications
  * @property Permissions $permissions
+ * @property Rabbitmq $rabbitmq
  * @property Synchronization $synchronization
  * @property Timezones $timezones
  * @property Webhooks_client $webhooks_client
@@ -79,6 +80,8 @@ class EA_Controller extends CI_Controller
     {
         parent::__construct();
 
+        $this->redirect_to_installation_if_required();
+
         $this->load->library('accounts');
 
         $this->check_storage_writable();
@@ -89,6 +92,24 @@ class EA_Controller extends CI_Controller
         $this->load_common_script_vars();
 
         rate_limit($this->input->ip_address());
+    }
+
+    /**
+     * Redirect every request to the installation page while the application
+     * has not been set up yet (first run), so that the initial settings and
+     * the administrator account can be configured before using the app.
+     *
+     * Only the "installation" controller itself is allowed to run in that state.
+     */
+    private function redirect_to_installation_if_required(): void
+    {
+        if (strtolower($this->router->class) === 'installation') {
+            return;
+        }
+
+        if (!is_app_installed()) {
+            redirect('installation');
+        }
     }
 
     private function ensure_user_exists()
@@ -174,7 +195,7 @@ class EA_Controller extends CI_Controller
             return;
         }
 
-        $default_timezone = setting('default_timezone');
+        $default_timezone = setting('default_timezone') ?: 'Europe/Moscow';
 
         date_default_timezone_set($default_timezone);
     }

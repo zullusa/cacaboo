@@ -48,9 +48,24 @@ class Installation extends EA_Controller
             return;
         }
 
+        $this->force_russian_language();
+
         $this->load->view('pages/installation', [
             'base_url' => config('base_url'),
         ]);
+    }
+
+    /**
+     * Make sure the installation page is always rendered in Russian.
+     */
+    private function force_russian_language(): void
+    {
+        config([
+            'language' => 'russian',
+            'language_code' => 'ru',
+        ]);
+
+        $this->lang->load('translations', 'russian');
     }
 
     /**
@@ -137,7 +152,7 @@ class Installation extends EA_Controller
             $this->instance->migrate();
 
             // Insert admin
-            $admin['timezone'] = date_default_timezone_get();
+            $admin['timezone'] = 'Europe/Moscow';
             $admin['settings']['username'] = $admin['username'];
             $admin['settings']['password'] = $admin['password'];
             $admin['settings']['notifications'] = true;
@@ -161,35 +176,33 @@ class Installation extends EA_Controller
                 'company_link' => $company['company_link'],
             ]);
 
-            // Service
-            $service_id = $this->services_model->save([
-                'name' => 'Service',
-                'duration' => '30',
+            // Services
+            $service_work_id = $this->services_model->save([
+                'name' => 'В РАБОТУ',
+                'duration' => '60',
                 'price' => '0',
                 'currency' => '',
-                'slot_interval' => 15,
+                'slot_interval' => 120,
+                'color' => '#abe9a4',
                 'attendants_number' => '1',
+                'is_private' => '0',
+            ]);
+
+            $service_first_id = $this->services_model->save([
+                'name' => 'ПЕРВИЧКА',
+                'duration' => '60',
+                'price' => '0',
+                'currency' => '',
+                'slot_interval' => 120,
+                'color' => '#ebe07c',
+                'attendants_number' => '1',
+                'is_private' => '0',
             ]);
 
             // Provider
             $this->providers_model->save([
-                'first_name' => 'Jane',
-                'last_name' => 'Doe',
-                'email' => 'jane@example.org',
-                'phone_number' => '+1 (000) 000-0000',
-                'services' => [$service_id],
-                'language' => $admin['language'],
-                'timezone' => $admin['timezone'],
-                'settings' => [
-                    'username' => 'janedoe',
-                    'password' => random_string(),
-                    'working_plan' => setting('company_working_plan'),
-                    'notifications' => true,
-                    'google_sync' => false,
-                    'sync_past_days' => 30,
-                    'sync_future_days' => 90,
-                    'calendar_view' => CALENDAR_VIEW_DEFAULT,
-                ],
+                'name' => 'STO',
+                'services' => [$service_work_id, $service_first_id],
             ]);
 
             // Customer

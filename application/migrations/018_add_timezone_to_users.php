@@ -23,7 +23,7 @@ class Migration_Add_timezone_to_users extends EA_Migration
                 'timezone' => [
                     'type' => 'VARCHAR',
                     'constraint' => '256',
-                    'default' => 'UTC',
+                    'default' => 'Europe/Moscow',
                     'after' => 'notes',
                 ],
             ];

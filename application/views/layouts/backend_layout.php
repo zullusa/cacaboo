@@ -9,7 +9,7 @@
 
     <?php slot('meta'); ?>
 
-    <title><?= vars('page_title') ?? lang('backend_section') ?> | Easy!Appointments</title>
+    <title><?= vars('page_title') ?? lang('backend_section') ?> | CaCaBoo</title>
 
     <link rel="icon" type="image/x-icon" href="<?= asset_url('assets/img/favicon.ico') ?>">
     <link rel="icon" sizes="192x192" href="<?= asset_url('assets/img/logo.png') ?>">
@@ -42,7 +42,7 @@
 <script src="<?= asset_url('assets/vendor/jquery/jquery.min.js') ?>"></script>
 <script src="<?= asset_url('assets/vendor/@popperjs-core/popper.min.js') ?>"></script>
 <script src="<?= asset_url('assets/vendor/bootstrap/bootstrap.min.js') ?>"></script>
-<script src="<?= asset_url('assets/vendor/moment/moment.min.js') ?>"></script>
+<script src="<?= asset_url('assets/vendor/moment/moment-with-locales.min.js') ?>"></script>
 <script src="<?= asset_url('assets/vendor/moment-timezone/moment-timezone-with-data.min.js') ?>"></script>
 <script src="<?= asset_url('assets/vendor/@fortawesome-fontawesome-free/fontawesome.min.js') ?>"></script>
 <script src="<?= asset_url('assets/vendor/@fortawesome-fontawesome-free/solid.min.js') ?>"></script>

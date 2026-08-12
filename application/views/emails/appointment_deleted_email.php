@@ -25,7 +25,7 @@ $customer_address = trim((string) ($customer['address'] ?? ''));
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
     <title>
-        <?= lang('appointment_cancelled_title') ?> | Easy!Appointments
+        <?= lang('appointment_cancelled_title') ?> | CaCaBoo
     </title>
     <style>
         /* -------------------------------------
@@ -432,7 +432,7 @@ $customer_address = trim((string) ($customer['address'] ?? ''));
                                                     <?= lang('provider') ?>
                                                 </td>
                                                 <td style="padding: 3px;">
-                                                    <?= e($provider['first_name'] . ' ' . $provider['last_name']) ?>
+                                                    <?= e($provider['name']) ?>
                                                 </td>
                                             </tr>
                                             <tr>
@@ -450,14 +450,6 @@ $customer_address = trim((string) ($customer['address'] ?? ''));
                                                 <td style="padding: 3px;">
                                                     <?= format_date_time($appointment['end_datetime']) ?>
 
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td class="label" style="padding: 3px;font-weight: bold;">
-                                                    <?= lang('timezone') ?>
-                                                </td>
-                                                <td style="padding: 3px;">
-                                                    <?= format_timezone($timezone) ?>
                                                 </td>
                                             </tr>
 
@@ -482,40 +474,6 @@ $customer_address = trim((string) ($customer['address'] ?? ''));
                                                     <?= nl2br(e($service['description'])) ?>
                                                 </td>
                                             </tr>
-                                            <?php endif; ?>
-
-                                            <?php if (!empty($appointment['location'])): ?>
-                                                <tr>
-                                                    <td class="label" style="padding: 3px;font-weight: bold;">
-                                                        <?= lang('location') ?>
-                                                    </td>
-                                                    <td style="padding: 3px;">
-                                                        <?php if (str_starts_with($appointment['location'], 'http')): ?>
-                                                            <a 
-                                                                href="<?= e($appointment['location']) ?>" 
-                                                                target="_blank">
-                                                                <?= e($appointment['location']) ?>
-                                                            </a>
-                                                        <?php else: ?>
-                                                        <?= e($appointment['location']) ?>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                </tr>
-                                            <?php endif; ?>
-
-                                            <?php if (!empty($appointment['meeting_link'])): ?>
-                                                <tr>
-                                                    <td class="label" style="padding: 3px;font-weight: bold;">
-                                                        <?= lang('meeting_link') ?>
-                                                    </td>
-                                                    <td style="padding: 3px;">
-                                                        <a
-                                                            href="<?= e($appointment['meeting_link']) ?>"
-                                                            target="_blank">
-                                                            <?= e($appointment['meeting_link']) ?>
-                                                        </a>
-                                                    </td>
-                                                </tr>
                                             <?php endif; ?>
 
                                             <?php if (!empty($appointment['notes'])): ?>
@@ -629,8 +587,8 @@ $customer_address = trim((string) ($customer['address'] ?? ''));
                         <tr>
                             <td class="content-block powered-by">
                                 Powered by
-                                <a href="https://easyappointments.org" style="text-decoration: none;">
-                                    Easy!Appointments
+                                <a href="https://sto-pitstop.ru" style="text-decoration: none;">
+                                    CaCaBoo
                                 </a>
                                 |
                                 <a href="<?= e($settings['company_link']) ?>" style="text-decoration: none;">

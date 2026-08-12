@@ -6,26 +6,19 @@ Docker lets you run Easy!Appointments on your computer without installing Apache
 
 1. Make sure you have [Docker](https://www.docker.com/) installed.
 2. Clone or download the project.
-3. Edit the `config.php` file in the root folder to match the Docker setup:
+3. Copy `.env.example` to `.env` and update the values to match your setup:
 
-```php
-class Config {
-    // GENERAL SETTINGS
-    const BASE_URL      = 'http://localhost';
-    const LANGUAGE      = 'english';
-    const DEBUG_MODE    = TRUE;
+```dotenv
+# Application
+BASE_URL=http://localhost
+DEFAULT_LANGUAGE=russian
+DEBUG_MODE=true
 
-    // DATABASE SETTINGS
-    const DB_HOST       = 'mysql';
-    const DB_NAME       = 'easyappointments';
-    const DB_USERNAME   = 'user';
-    const DB_PASSWORD   = 'password';
-
-    // GOOGLE CALENDAR SYNC
-    const GOOGLE_SYNC_FEATURE   = FALSE;
-    const GOOGLE_CLIENT_ID      = '';
-    const GOOGLE_CLIENT_SECRET  = '';
-}
+# Database
+DB_HOST=mysql
+MYSQL_DATABASE=easyappointments
+MYSQL_USER=user
+MYSQL_PASSWORD=password
 ```
 
 4. Start everything with:

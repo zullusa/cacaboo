@@ -38,25 +38,6 @@
 
 /*
  *---------------------------------------------------------------
- * EASY!APPOINTMENTS CONFIGURATION
- *---------------------------------------------------------------
- *
- * Include Easy!Appointments configuration file so that it is available
- * globally in the application. You can access configuration information
- * through the static Config class.
- *
- */
-
-if (!file_exists(__DIR__ . '/config.php')) {
-    die(
-        'The root "config.php" file is missing, please copy "config-sample.php" to "config.php" and update it with your server data.'
-    );
-}
-
-require_once __DIR__ . '/config.php';
-
-/*
- *---------------------------------------------------------------
  * SESSION GARBAGE COLLECTION
  *---------------------------------------------------------------
  *
@@ -123,7 +104,9 @@ $app_env = getenv('APP_ENV');
 if ($app_env) {
     define('ENVIRONMENT', $app_env);
 } else {
-    define('ENVIRONMENT', Config::DEBUG_MODE ? 'development' : 'production');
+    $debug_mode = getenv('DEBUG_MODE');
+    $is_debug = $debug_mode === false ? false : filter_var($debug_mode, FILTER_VALIDATE_BOOLEAN);
+    define('ENVIRONMENT', $is_debug ? 'development' : 'production');
 }
 
 /*

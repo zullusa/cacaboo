@@ -126,10 +126,8 @@ class Appointments_model extends EA_Model
         // Make sure the provider ID really exists in the database.
         $count = $this->db
             ->select()
-            ->from('users')
-            ->join('roles', 'roles.id = users.id_roles', 'inner')
-            ->where('users.id', $appointment['id_users_provider'])
-            ->where('roles.slug', DB_SLUG_PROVIDER)
+            ->from('providers')
+            ->where('id', $appointment['id_users_provider'])
             ->get()
             ->num_rows();
 
@@ -216,6 +214,9 @@ class Appointments_model extends EA_Model
         $appointment['update_datetime'] = date('Y-m-d H:i:s');
         $appointment['hash'] = random_string('alnum', 12);
 
+        // Store the name of the current system user as the author of the appointment.
+        $appointment['author'] = $this->get_current_user_name();
+
         if (!$this->db->insert('appointments', $appointment)) {
             throw new RuntimeException('Could not insert appointment.');
         }
@@ -241,6 +242,24 @@ class Appointments_model extends EA_Model
         }
 
         return $appointment['id'];
+    }
+
+    /**
+     * Get the display name of the currently logged in system user.
+     *
+     * @return string Returns the full name of the user or an empty string if there is no authenticated user.
+     */
+    protected function get_current_user_name(): string
+    {
+        $user_id = (int) session('user_id');
+
+        if (empty($user_id)) {
+            return '';
+        }
+
+        $user = $this->db->get_where('users', ['id' => $user_id])->row_array();
+
+        return trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''));
     }
 
     /**
@@ -471,7 +490,7 @@ class Appointments_model extends EA_Model
             ->select('appointments.*')
             ->from('appointments')
             ->join('services', 'services.id = appointments.id_services', 'left')
-            ->join('users AS providers', 'providers.id = appointments.id_users_provider', 'inner')
+            ->join('providers', 'providers.id = appointments.id_users_provider', 'inner')
             ->join('users AS customers', 'customers.id = appointments.id_users_customer', 'left')
             ->where('is_unavailability', false)
             ->group_start()
@@ -482,10 +501,7 @@ class Appointments_model extends EA_Model
             ->or_like('appointments.notes', $keyword)
             ->or_like('services.name', $keyword)
             ->or_like('services.description', $keyword)
-            ->or_like('providers.first_name', $keyword)
-            ->or_like('providers.last_name', $keyword)
-            ->or_like('providers.email', $keyword)
-            ->or_like('providers.phone_number', $keyword)
+            ->or_like('providers.name', $keyword)
             ->or_like('customers.first_name', $keyword)
             ->or_like('customers.last_name', $keyword)
             ->or_like('customers.email', $keyword)
@@ -563,11 +579,11 @@ class Appointments_model extends EA_Model
                     break;
 
                 case 'provider':
-                    $appointment['provider'] = $this->db
-                        ->get_where('users', [
-                            'id' => $appointment['id_users_provider'] ?? ($appointment['providerId'] ?? null),
-                        ])
-                        ->row_array();
+                    $this->load->model('providers_model');
+
+                    $appointment['provider'] = $this->providers_model->find(
+                        $appointment['id_users_provider'] ?? ($appointment['providerId'] ?? null),
+                    );
                     break;
 
                 case 'customer':

@@ -28,7 +28,7 @@ class Timezones
     /**
      * @var string
      */
-    protected string $default = 'UTC';
+    protected string $default = 'Europe/Moscow';
 
     /**
      * @var array

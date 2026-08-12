@@ -101,7 +101,7 @@ App.Http.Booking = (function () {
                 }
 
                 const providerTimezone = provider.timezone;
-                const selectedTimezone = $('#select-timezone').val();
+                const selectedTimezone = 'Europe/Moscow';
                 const timeFormat = vars('time_format') === 'regular' ? 'h:mm a' : 'HH:mm';
 
                 response.forEach((availableHour) => {

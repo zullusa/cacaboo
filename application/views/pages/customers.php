@@ -75,6 +75,7 @@
 
                     <div id="form-message" class="alert" style="display:none;"></div>
 
+                    <?php if (vars('display_first_name')): ?>
                     <div class="mb-3">
                         <label for="first-name" class="form-label">
                             <?= lang('first_name') ?>
@@ -86,7 +87,9 @@
                                class="<?= vars('require_first_name') ? 'required' : '' ?> form-control" maxlength="100"
                                disabled/>
                     </div>
+                    <?php endif; ?>
 
+                    <?php if (vars('display_last_name')): ?>
                     <div class="mb-3">
                         <label for="last-name" class="form-label">
                             <?= lang('last_name') ?>
@@ -98,7 +101,9 @@
                                class="<?= vars('require_last_name') ? 'required' : '' ?> form-control" maxlength="120"
                                disabled/>
                     </div>
+                    <?php endif; ?>
 
+                    <?php if (vars('display_email')): ?>
                     <div class="mb-3">
                         <label for="email" class="form-label">
                             <?= lang('email') ?>
@@ -110,7 +115,9 @@
                                class="<?= vars('require_email') ? 'required' : '' ?> form-control" maxlength="120"
                                disabled/>
                     </div>
+                    <?php endif; ?>
 
+                    <?php if (vars('display_phone_number')): ?>
                     <div class="mb-3">
                         <label for="phone-number" class="form-label">
                             <?= lang('phone_number') ?>
@@ -118,10 +125,15 @@
                                 <span class="text-danger" hidden>*</span>
                             <?php endif; ?>
                         </label>
-                        <input type="text" id="phone-number" maxlength="60"
-                               class="<?= vars('require_phone_number') ? 'required' : '' ?> form-control" disabled/>
+                        <div class="input-group">
+                            <span class="input-group-text">+7</span>
+                            <input type="text" id="phone-number" maxlength="10" inputmode="numeric"
+                                   class="<?= vars('require_phone_number') ? 'required' : '' ?> form-control" disabled/>
+                        </div>
                     </div>
+                    <?php endif; ?>
 
+                    <?php if (vars('display_address')): ?>
                     <div class="mb-3">
                         <label for="address" class="form-label">
                             <?= lang('address') ?>
@@ -133,7 +145,9 @@
                                class="<?= vars('require_address') ? 'required' : '' ?> form-control"
                                maxlength="120" disabled/>
                     </div>
+                    <?php endif; ?>
 
+                    <?php if (vars('display_city')): ?>
                     <div class="mb-3">
                         <label for="city" class="form-label">
                             <?= lang('city') ?>
@@ -144,7 +158,9 @@
                         <input type="text" id="city" class="<?= vars('require_city') ? 'required' : '' ?> form-control"
                                maxlength="120" disabled/>
                     </div>
+                    <?php endif; ?>
 
+                    <?php if (vars('display_zip_code')): ?>
                     <div class="mb-3">
                         <label for="zip-code" class="form-label">
                             <?= lang('zip_code') ?>
@@ -156,31 +172,7 @@
                                class="<?= vars('require_zip_code') ? 'required' : '' ?> form-control"
                                maxlength="120" disabled/>
                     </div>
-
-                    <div class="mb-3">
-                        <label class="form-label" for="language">
-                            <?= lang('language') ?>
-                            <span class="text-danger" hidden>*</span>
-                        </label>
-                        <select id="language" class="form-select required" disabled>
-                            <?php foreach (vars('available_languages') as $available_language): ?>
-                                <option value="<?= $available_language ?>">
-                                    <?= ucfirst($available_language) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label" for="timezone">
-                            <?= lang('timezone') ?>
-                            <span class="text-danger" hidden>*</span>
-                        </label>
-                        <?php component('timezone_dropdown', [
-                            'attributes' => 'id="timezone" class="form-select required" disabled',
-                            'grouped_timezones' => vars('grouped_timezones'),
-                        ]); ?>
-                    </div>
+                    <?php endif; ?>
 
                     <?php if (setting('ldap_is_active')): ?>
                         <div class="mb-3">
@@ -195,12 +187,14 @@
                         'disabled' => true,
                     ]); ?>
 
+                    <?php if (vars('display_notes')): ?>
                     <div class="mb-3">
                         <label class="form-label" for="notes">
                             <?= lang('notes') ?>
                         </label>
                         <textarea id="notes" rows="4" class="form-control" disabled></textarea>
                     </div>
+                    <?php endif; ?>
 
                 </div>
 

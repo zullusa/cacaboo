@@ -4,7 +4,7 @@
 
 <div class="text-center mb-4">
     <img src="<?= asset_url('assets/img/logo.png') ?>" 
-         alt="Easy!Appointments" class="shadow mb-3" width="72" height="72">
+         alt="CaCaBoo" class="shadow mb-3" width="72" height="72">
     <h4 class="text-primary fw-semibold mb-1"><?= lang('backend_section') ?></h4>
     <p class=" small mb-0"><?= lang('you_need_to_login') ?></p>
 </div>

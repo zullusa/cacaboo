@@ -91,6 +91,14 @@ class Customers extends EA_Controller
 
         $date_format = setting('date_format');
         $time_format = setting('time_format');
+        $display_first_name = setting('display_first_name');
+        $display_last_name = setting('display_last_name');
+        $display_email = setting('display_email');
+        $display_phone_number = setting('display_phone_number');
+        $display_address = setting('display_address');
+        $display_city = setting('display_city');
+        $display_zip_code = setting('display_zip_code');
+        $display_notes = setting('display_notes');
         $require_first_name = setting('require_first_name');
         $require_last_name = setting('require_last_name');
         $require_email = setting('require_email');
@@ -98,6 +106,7 @@ class Customers extends EA_Controller
         $require_address = setting('require_address');
         $require_city = setting('require_city');
         $require_zip_code = setting('require_zip_code');
+        $require_notes = setting('require_notes');
 
         $secretary_providers = [];
 
@@ -115,7 +124,7 @@ class Customers extends EA_Controller
             'timezones' => $this->timezones->to_array(),
             'secretary_providers' => $secretary_providers,
             'default_language' => setting('default_language'),
-            'default_timezone' => setting('default_timezone'),
+            'default_timezone' => setting('default_timezone', 'Europe/Moscow'),
         ]);
 
         html_vars([
@@ -125,6 +134,14 @@ class Customers extends EA_Controller
             'timezones' => $this->timezones->to_array(),
             'grouped_timezones' => $this->timezones->to_grouped_array(),
             'privileges' => $this->roles_model->get_permissions_by_slug($role_slug),
+            'display_first_name' => $display_first_name,
+            'display_last_name' => $display_last_name,
+            'display_email' => $display_email,
+            'display_phone_number' => $display_phone_number,
+            'display_address' => $display_address,
+            'display_city' => $display_city,
+            'display_zip_code' => $display_zip_code,
+            'display_notes' => $display_notes,
             'require_first_name' => $require_first_name,
             'require_last_name' => $require_last_name,
             'require_email' => $require_email,
@@ -132,6 +149,7 @@ class Customers extends EA_Controller
             'require_address' => $require_address,
             'require_city' => $require_city,
             'require_zip_code' => $require_zip_code,
+            'require_notes' => $require_notes,
             'available_languages' => config('available_languages'),
         ]);
 
@@ -270,6 +288,8 @@ class Customers extends EA_Controller
 
             $customer = request('customer');
 
+            $customer['timezone'] = 'Europe/Moscow';
+
             $this->customers_model->only($customer, $this->allowed_customer_fields);
 
             $this->customers_model->optional($customer, $this->optional_customer_fields);
@@ -310,6 +330,8 @@ class Customers extends EA_Controller
             if (!$this->permissions->has_customer_access($user_id, $customer['id'])) {
                 abort(403, 'Forbidden');
             }
+
+            $customer['timezone'] = 'Europe/Moscow';
 
             $this->customers_model->only($customer, $this->allowed_customer_fields);
 

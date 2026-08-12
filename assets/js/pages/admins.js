@@ -28,7 +28,6 @@ App.Pages.Admins = (function () {
     const $zipCode = $('#zip-code');
     const $notes = $('#notes');
     const $language = $('#language');
-    const $timezone = $('#timezone');
     const $ldapDn = $('#ldap-dn');
     const $username = $('#username');
     const $password = $('#password');
@@ -200,7 +199,7 @@ App.Pages.Admins = (function () {
                 zip_code: $zipCode.val(),
                 notes: $notes.val(),
                 language: $language.val(),
-                timezone: $timezone.val(),
+                timezone: vars('default_timezone'),
                 ldap_dn: $ldapDn.val(),
                 settings: {
                     username: $username.val(),
@@ -356,7 +355,6 @@ App.Pages.Admins = (function () {
         $admins.find('.record-details .form-label span').prop('hidden', true);
         $admins.find('.record-details #calendar-view').val('default');
         $admins.find('.record-details #language').val(vars('default_language'));
-        $admins.find('.record-details #timezone').val(vars('default_timezone'));
         $admins.find('.record-details #notifications').prop('checked', true);
         $('#edit-admin, #delete-admin').prop('disabled', true);
 
@@ -382,7 +380,6 @@ App.Pages.Admins = (function () {
         $zipCode.val(admin.zip_code);
         $notes.val(admin.notes);
         $language.val(admin.language);
-        $timezone.val(admin.timezone);
         $ldapDn.val(admin.ldap_dn);
 
         $username.val(admin.settings.username);

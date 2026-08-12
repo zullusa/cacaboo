@@ -21,7 +21,7 @@ class Migration_Add_default_language_setting extends EA_Migration
         if (!$this->db->get_where('settings', ['name' => 'default_language'])->num_rows()) {
             $this->db->insert('settings', [
                 'name' => 'default_language',
-                'value' => 'english',
+                'value' => 'russian',
             ]);
         }
     }

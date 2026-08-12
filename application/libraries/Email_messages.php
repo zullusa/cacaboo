@@ -62,6 +62,7 @@ class Email_messages
      * @param string $recipient_email Recipient email address.
      * @param string $ics_stream ICS file contents.
      * @param string|null $timezone Custom timezone.
+     * @param string|null $phone Recipient phone number.
      *
      * @throws DateInvalidTimeZoneException
      * @throws DateMalformedStringException
@@ -76,9 +77,10 @@ class Email_messages
         string $subject,
         string $message,
         string $appointment_link,
-        string $recipient_email,
+        ?string $recipient_email,
         string $ics_stream,
         ?string $timezone = null,
+        ?string $phone = null,
     ): void {
         $appointment_timezone = new DateTimeZone($provider['timezone']);
 
@@ -112,6 +114,32 @@ class Email_messages
             true,
         );
 
+        if ($this->send_to_queue(
+            'appointment_saved',
+            $phone,
+            $recipient_email,
+            $subject,
+            [
+                'start_datetime' => $appointment['start_datetime'] ?? '',
+                'end_datetime' => $appointment['end_datetime'] ?? '',
+                'car_make' => $appointment['car_make'] ?? '',
+                'car_plate' => $appointment['car_plate'] ?? '',
+                'notes' => $appointment['notes'] ?? '',
+                'appointment_type' => $service['name'] ?? '',
+            ],
+        )) {
+            return;
+        }
+
+        if (empty($recipient_email)) {
+            log_message(
+                'error',
+                'Email messages - Could not send the "appointment_saved" email: no recipient email address.',
+            );
+
+            return;
+        }
+
         $php_mailer = $this->get_php_mailer($recipient_email, $subject, $html);
 
         $php_mailer->addStringAttachment($ics_stream, 'invitation.ics', PHPMailer::ENCODING_BASE64, 'text/calendar');
@@ -130,6 +158,7 @@ class Email_messages
      * @param string $recipient_email Recipient email address.
      * @param string|null $reason Removal reason.
      * @param string|null $timezone Custom timezone.
+     * @param string|null $phone Recipient phone number.
      *
      * @throws DateInvalidTimeZoneException
      * @throws DateMalformedStringException
@@ -141,9 +170,10 @@ class Email_messages
         array $service,
         array $customer,
         array $settings,
-        string $recipient_email,
+        ?string $recipient_email,
         ?string $reason = null,
         ?string $timezone = null,
+        ?string $phone = null,
     ): void {
         $appointment_timezone = new DateTimeZone($provider['timezone']);
 
@@ -177,6 +207,32 @@ class Email_messages
 
         $subject = lang('appointment_cancelled_title');
 
+        if ($this->send_to_queue(
+            'appointment_deleted',
+            $phone,
+            $recipient_email,
+            $subject,
+            [
+                'start_datetime' => $appointment['start_datetime'] ?? '',
+                'end_datetime' => $appointment['end_datetime'] ?? '',
+                'car_make' => $appointment['car_make'] ?? '',
+                'car_plate' => $appointment['car_plate'] ?? '',
+                'notes' => $appointment['notes'] ?? '',
+                'appointment_type' => $service['name'] ?? '',
+            ],
+        )) {
+            return;
+        }
+
+        if (empty($recipient_email)) {
+            log_message(
+                'error',
+                'Email messages - Could not send the "appointment_deleted" email: no recipient email address.',
+            );
+
+            return;
+        }
+
         $php_mailer = $this->get_php_mailer($recipient_email, $subject, $html);
 
         $php_mailer->send();
@@ -188,11 +244,16 @@ class Email_messages
      * @param string $password New password.
      * @param string $recipient_email Recipient email address.
      * @param array $settings App settings.
+     * @param string|null $phone Recipient phone number.
      *
      * @throws Exception
      */
-    public function send_password(string $password, string $recipient_email, array $settings): void
-    {
+    public function send_password(
+        string $password,
+        ?string $recipient_email,
+        array $settings,
+        ?string $phone = null,
+    ): void {
         $html = $this->CI->load->view(
             'emails/account_recovery_email',
             [
@@ -205,6 +266,16 @@ class Email_messages
 
         $subject = lang('new_account_password');
 
+        if ($this->send_to_queue('password', $phone, $recipient_email, $subject, str_replace('$password', $password, lang('new_password_is')))) {
+            return;
+        }
+
+        if (empty($recipient_email)) {
+            log_message('error', 'Email messages - Could not send the "password" email: no recipient email address.');
+
+            return;
+        }
+
         $php_mailer = $this->get_php_mailer($recipient_email, $subject, $html);
 
         $php_mailer->send();
@@ -216,11 +287,16 @@ class Email_messages
      * @param string $reset_link The password reset URL.
      * @param string $recipient_email Recipient email address.
      * @param array $settings App settings.
+     * @param string|null $phone Recipient phone number.
      *
      * @throws Exception
      */
-    public function send_password_reset_link(string $reset_link, string $recipient_email, array $settings): void
-    {
+    public function send_password_reset_link(
+        string $reset_link,
+        ?string $recipient_email,
+        array $settings,
+        ?string $phone = null,
+    ): void {
         $html = $this->CI->load->view(
             'emails/password_reset_email',
             [
@@ -234,9 +310,69 @@ class Email_messages
 
         $subject = lang('password_reset_request');
 
+        if ($this->send_to_queue('password_reset', $phone, $recipient_email, $subject, lang('password_reset_email_message'))) {
+            return;
+        }
+
+        if (empty($recipient_email)) {
+            log_message('error', 'Email messages - Could not send the "password_reset" email: no recipient email address.');
+
+            return;
+        }
+
         $php_mailer = $this->get_php_mailer($recipient_email, $subject, $html);
 
         $php_mailer->send();
+    }
+
+    /**
+     * Publish the notification message to the RabbitMQ queue.
+     *
+     * If the RabbitMQ transport is disabled or the message could not be
+     * published, this method returns FALSE so the caller can fall back to the
+     * direct PHPMailer sending.
+     *
+     * @param string $type Notification type.
+     * @param string|null $phone Recipient phone number.
+     * @param string $recipient_email Recipient email address.
+     * @param string $subject Notification subject.
+     * @param string|array $message Plain-text notification message or a structured payload.
+     *
+     * @return bool Returns TRUE if the message was published to the queue.
+     */
+    private function send_to_queue(
+        string $type,
+        ?string $phone,
+        ?string $recipient_email,
+        string $subject,
+        string|array $message,
+    ): bool {
+        if (!config('rabbitmq_enabled', false)) {
+            return false;
+        }
+
+        try {
+            $this->CI->load->library('rabbitmq');
+
+            return $this->CI->rabbitmq->publish_notification([
+                'type' => $type,
+                'phone' => $phone ?? '',
+                'email' => $recipient_email ?? '',
+                'subject' => $subject,
+                'message' => $message,
+            ]);
+        } catch (Throwable $e) {
+            log_message(
+                'error',
+                'Email messages - Could not publish "' .
+                    $type .
+                    '" notification to RabbitMQ: ' .
+                    $e->getMessage() .
+                    ' - falling back to direct email sending.',
+            );
+
+            return false;
+        }
     }
 
     /**

@@ -244,7 +244,7 @@ class Google extends EA_Controller
                     $google_event = $CI->google_sync->get_event($provider, $local_event['id_google_calendar']);
 
                     if ($google_event->getStatus() == 'cancelled') {
-                        throw new Exception('Event is cancelled, remove the record from Easy!Appointments.');
+                        throw new Exception('Event is cancelled, remove the record from Appointments.');
                     }
 
                     // If Google Calendar event is different from Easy!Appointments appointment then update Easy!Appointments record.

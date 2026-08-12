@@ -51,6 +51,8 @@ class Calendar extends EA_Controller
         'location',
         'meeting_link',
         'notes',
+        'car_make',
+        'car_plate',
         'color',
         'status',
         'is_unavailability',
@@ -213,6 +215,7 @@ class Calendar extends EA_Controller
         script_vars([
             'user_id' => $user_id,
             'role_slug' => $role_slug,
+            'user_display_name' => $this->accounts->get_user_display_name($user_id),
             'date_format' => setting('date_format'),
             'time_format' => setting('time_format'),
             'first_weekday' => setting('first_weekday'),
@@ -230,7 +233,7 @@ class Calendar extends EA_Controller
             ),
             'customers' => $customers,
             'default_language' => setting('default_language'),
-            'default_timezone' => setting('default_timezone'),
+            'default_timezone' => setting('default_timezone', 'Europe/Moscow'),
         ]);
 
         html_vars([
@@ -246,6 +249,14 @@ class Calendar extends EA_Controller
             'available_services' => $available_services,
             'secretary_providers' => $secretary_providers,
             'appointment_status_options' => json_decode($appointment_status_options, true) ?? [],
+            'display_first_name' => setting('display_first_name'),
+            'display_last_name' => setting('display_last_name'),
+            'display_email' => setting('display_email'),
+            'display_phone_number' => setting('display_phone_number'),
+            'display_address' => setting('display_address'),
+            'display_city' => setting('display_city'),
+            'display_zip_code' => setting('display_zip_code'),
+            'display_notes' => setting('display_notes'),
             'require_first_name' => setting('require_first_name'),
             'require_last_name' => setting('require_last_name'),
             'require_email' => setting('require_email'),
@@ -294,6 +305,9 @@ class Calendar extends EA_Controller
                     throw new RuntimeException('You do not have the required permissions for this task.');
                 }
 
+                // The business always operates in the Moscow timezone (UTC+3).
+                $customer['timezone'] = 'Europe/Moscow';
+
                 $this->customers_model->only($customer, $this->allowed_customer_fields);
 
                 $this->customers_model->optional($customer, $this->optional_customer_fields);
@@ -328,6 +342,11 @@ class Calendar extends EA_Controller
 
                 // Check if the provider has a conflicting appointment at the selected time
                 $exclude_appointment_id = !empty($appointment['id']) ? (int) $appointment['id'] : null;
+
+                // The car make and plate fields are required for every appointment.
+                if (empty($appointment['car_make']) || empty($appointment['car_plate'])) {
+                    throw new RuntimeException('The car make and car plate fields are required.');
+                }
 
                 $has_conflict = $this->appointments_model->has_provider_conflict(
                     (int) $appointment['id_users_provider'],

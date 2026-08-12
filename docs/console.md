@@ -48,7 +48,7 @@ Runs the installer from the command line (instead of using the browser):
 php index.php console install
 ```
 
-Make sure you've already filled in your `config.php` file before running this.
+Make sure you've already configured your `.env` file before running this.
 
 ### Backup
 

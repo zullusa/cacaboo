@@ -118,10 +118,8 @@ class Unavailabilities_model extends EA_Model
         // Make sure the provider ID really exists in the database.
         $count = $this->db
             ->select()
-            ->from('users')
-            ->join('roles', 'roles.id = users.id_roles', 'inner')
-            ->where('users.id', $unavailability['id_users_provider'])
-            ->where('roles.slug', DB_SLUG_PROVIDER)
+            ->from('providers')
+            ->where('id', $unavailability['id_users_provider'])
             ->get()
             ->num_rows();
 
@@ -315,7 +313,7 @@ class Unavailabilities_model extends EA_Model
         $unavailabilities = $this->db
             ->select()
             ->from('appointments')
-            ->join('users AS providers', 'providers.id = appointments.id_users_provider', 'inner')
+            ->join('providers', 'providers.id = appointments.id_users_provider', 'inner')
             ->where('is_unavailability', true)
             ->group_start()
             ->like('appointments.start_datetime', $keyword)
@@ -323,10 +321,7 @@ class Unavailabilities_model extends EA_Model
             ->or_like('appointments.location', $keyword)
             ->or_like('appointments.hash', $keyword)
             ->or_like('appointments.notes', $keyword)
-            ->or_like('providers.first_name', $keyword)
-            ->or_like('providers.last_name', $keyword)
-            ->or_like('providers.email', $keyword)
-            ->or_like('providers.phone_number', $keyword)
+            ->or_like('providers.name', $keyword)
             ->group_end()
             ->limit($limit)
             ->offset($offset)

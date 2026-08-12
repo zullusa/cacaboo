@@ -1,9 +1,6 @@
 <?php
 /**
  * Local variables.
- *
- * @var array $timezones
- * @var string $timezone
  */
 ?>
 
@@ -42,32 +39,6 @@
                                 <span class="text-danger">*</span>
                             </label>
                             <input id="unavailability-end" class="form-control">
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">
-                                <?= lang('timezone') ?>
-                            </label>
-
-                            <div
-                                class="border rounded d-flex justify-content-between align-items-center bg-light timezone-info">
-                                <div class="border-end w-50 p-1 text-center">
-                                    <small>
-                                        <?= lang('provider') ?>:
-                                        <span class="provider-timezone">
-                                            -
-                                        </span>
-                                    </small>
-                                </div>
-                                <div class="w-50 p-1 text-center">
-                                    <small>
-                                        <?= lang('current_user') ?>:
-                                        <span>
-                                            <?= $timezones[session('timezone', 'UTC')] ?>
-                                        </span>
-                                    </small>
-                                </div>
-                            </div>
                         </div>
 
                         <div class="mb-3">
