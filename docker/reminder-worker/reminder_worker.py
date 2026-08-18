@@ -126,6 +126,7 @@ class ReminderWorker:
         self.subject = env("REMINDER_SUBJECT", "Напоминание о записи на СТО")
         self.table_prefix = env("DB_PREFIX", "ea_")
         self.notified_status = env("REMINDER_STATUS_NOTIFIED", "Оповещен")
+        self.booked_status = env("REMINDER_STATUS_BOOKED", "Записано")
         self.phone_prefix = env("REMINDER_PHONE_PREFIX", "+7")
         self.should_stop = False
         self.schema_missing_logged = False
@@ -294,9 +295,14 @@ class ReminderWorker:
             LEFT JOIN {self.table_prefix}services s ON s.id = a.id_services
             LEFT JOIN {self.table_prefix}users u ON u.id = a.id_users_customer
             WHERE a.is_unavailability = 0
+              AND a.status = %s
               AND a.start_datetime BETWEEN %s AND %s
             """,
-            (window_start.strftime("%Y-%m-%d %H:%M:%S"), window_end.strftime("%Y-%m-%d %H:%M:%S")),
+            (
+                self.booked_status,
+                window_start.strftime("%Y-%m-%d %H:%M:%S"),
+                window_end.strftime("%Y-%m-%d %H:%M:%S"),
+            ),
         )
         return cursor.fetchall()
 
