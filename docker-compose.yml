@@ -116,6 +116,30 @@ services:
       - mysql
     restart: unless-stopped
 
+  backup-worker:
+    build: docker/backup-worker
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=3306
+      - DB_NAME=${MYSQL_DATABASE}
+      - DB_USERNAME=${MYSQL_USER}
+      - DB_PASSWORD=${MYSQL_PASSWORD}
+      - TIMEZONE=${WORKER_TIMEZONE}
+      - BACKUP_TIME=${BACKUP_TIME:-02:00}
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-30}
+      - BACKUP_RUN_ON_START=${BACKUP_RUN_ON_START:-false}
+      - BACKUP_NAME_PREFIX=${BACKUP_NAME_PREFIX:-cacaboo}
+      - SMB_HOST=${SMB_HOST}
+      - SMB_PORT=${SMB_PORT:-445}
+      - SMB_SHARE=${SMB_SHARE}
+      - SMB_PATH=${SMB_PATH:-/}
+      - SMB_USERNAME=${SMB_USERNAME}
+      - SMB_PASSWORD=${SMB_PASSWORD}
+      - SMB_PROTOCOL=${SMB_PROTOCOL:-SMB3}
+    depends_on:
+      - mysql
+    restart: unless-stopped
+
   sms-service:
     build: sms-service
     environment:
