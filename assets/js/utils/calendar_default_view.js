@@ -164,38 +164,6 @@ App.Utils.CalendarDefaultView = (function () {
     }
 
     /**
-     * Check whether the given appointment status is a "notified" status.
-     *
-     * @param {string} status - Appointment status text.
-     * @returns {boolean} True if the status is a "notified" status.
-     */
-    function isNotifiedStatus(status) {
-        return /оповещ|notified|remind/i.test(status);
-    }
-
-    /**
-     * Render the appointment status emoji, composing the bell with a green
-     * checkmark overlay for the "notified" status.
-     *
-     * @param {Object} eventData - Appointment event data.
-     * @returns {string} Emoji or badge HTML for the given status.
-     */
-    function renderStatusEmoji(eventData) {
-        const emoji = getStatusEmoji(eventData.status);
-
-        if (isNotifiedStatus(eventData.status)) {
-            return (
-                '<span class="appointment-status-badge">' +
-                emoji +
-                '<span class="appointment-status-badge-overlay">✅</span>' +
-                '</span>'
-            );
-        }
-
-        return emoji;
-    }
-
-    /**
      * Render the appointment event tile content.
      *
      * @param {Object} info - FullCalendar event content info.
@@ -222,7 +190,7 @@ App.Utils.CalendarDefaultView = (function () {
                 '<div class="fc-event-title fc-sticky">' +
                 App.Utils.String.escapeHtml(info.event.title) +
                 '<br>Статус: ' +
-                renderStatusEmoji(eventData) +
+                getStatusEmoji(eventData.status) +
                 notesHtml +
                 '</div></div></div>',
         };
