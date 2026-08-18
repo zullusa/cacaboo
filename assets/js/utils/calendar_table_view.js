@@ -140,26 +140,6 @@ App.Utils.CalendarTableView = (function () {
     }
 
     /**
-     * Add the appointment status emoji to the bottom-right corner of the event tile.
-     *
-     * @param {Object} info - FullCalendar event info.
-     */
-    function onEventDidMount(info) {
-        const eventData = info.event.extendedProps.data;
-
-        if (isUnavailability(eventData) || !eventData?.status) {
-            return;
-        }
-
-        const $main = $(info.el).find('.fc-event-main');
-
-        $('<span/>', {
-            class: 'appointment-status-emoji',
-            text: getStatusEmoji(eventData.status),
-        }).appendTo($main.length ? $main : info.el);
-    }
-
-    /**
      * Get available providers based on user role.
      *
      * @returns {Array} Filtered providers array.
@@ -856,9 +836,15 @@ App.Utils.CalendarTableView = (function () {
 
                 const notes = appointment.notes ? '\n' + appointment.notes : '';
 
+                const statusLine = 'Статус: ' + getStatusEmoji(appointment.status);
+
                 const title = customerName
-                    ? customerName + phoneNumber + '\n' + providerName + '\n' + appointment.service.name + notes
-                    : appointment.service.name;
+                    ? customerName +
+                      phoneNumber +
+                      '\n' + appointment.service.name +
+                      '\n' + statusLine +
+                      notes
+                    : appointment.service.name + '\n' + statusLine;
 
                 return {
                     id: appointment.id,
@@ -1455,7 +1441,6 @@ App.Utils.CalendarTableView = (function () {
             eventClick: onEventClick,
             eventResize: onEventResize,
             eventDrop: onEventDrop,
-            eventDidMount: onEventDidMount,
             select: (info) => onSelect(info, fullCalendar),
         });
 
