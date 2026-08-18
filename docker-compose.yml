@@ -64,22 +64,6 @@ services:
     depends_on:
       - mysql
 
-  mailpit:
-    image: 'axllent/mailpit:v1.7'
-    ports:
-      - '${MAILPIT_HTTP_PORT:-8025}:8025'
-      - '${MAILPIT_SMTP_PORT:-1025}:1025'
-
-  # rabbitmq:
-  #   image: 'rabbitmq:3-management'
-  #   ports:
-  #     - '${RABBITMQ_PORT:-5672}:5672'
-  #     - '${RABBITMQ_MANAGEMENT_PORT:-15672}:15672'
-  #   environment:
-  #     - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
-  #     - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
-  #     - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_VHOST}
-
   reminder-worker:
     build: docker/reminder-worker
     environment:
@@ -183,43 +167,59 @@ services:
     depends_on:
       - php-fpm
 
-  baikal:
-    image: ckulka/baikal:0.10.1-apache
-    ports:
-      - "${BAIKAL_PORT:-8100}:80"
-    volumes:
-      - ./docker/baikal:/var/www/html
-      - ./docker/baikal/config:/var/www/baikal/config
-      - ./docker/baikal/data:/var/www/baikal/Specific
+  # baikal:
+  #   image: ckulka/baikal:0.10.1-apache
+  #   ports:
+  #     - "${BAIKAL_PORT:-8100}:80"
+  #   volumes:
+  #     - ./docker/baikal:/var/www/html
+  #     - ./docker/baikal/config:/var/www/baikal/config
+  #     - ./docker/baikal/data:/var/www/baikal/Specific
 
-  openldap:
-    image: osixia/openldap:1.5.0
-    hostname: openldap
-    ports:
-      - "${OPENLDAP_PORT:-389}:389"
-      - "${OPENLDAP_SSL_PORT:-636}:636"
-    volumes:
-      - ./docker/openldap/certificates:/container/service/slapd/assets/certs
-      - ./docker/openldap/slapd/database:/var/lib/ldap
-      - ./docker/openldap/slapd/config:/etc/ldap/slapd.d
-    environment:
-      - LDAP_ORGANISATION=example
-      - LDAP_DOMAIN=example.org
-      - LDAP_ADMIN_USERNAME=admin
-      - LDAP_ADMIN_PASSWORD=admin
-      - LDAP_CONFIG_PASSWORD=config_pass
-      - "LDAP_BASE_DN=dc=example,dc=org"
-      - LDAP_READONLY_USER=true
-      - LDAP_READONLY_USER_USERNAME=user
-      - LDAP_READONLY_USER_PASSWORD=password
+  # openldap:
+  #   image: osixia/openldap:1.5.0
+  #   hostname: openldap
+  #   ports:
+  #     - "${OPENLDAP_PORT:-389}:389"
+  #     - "${OPENLDAP_SSL_PORT:-636}:636"
+  #   volumes:
+  #     - ./docker/openldap/certificates:/container/service/slapd/assets/certs
+  #     - ./docker/openldap/slapd/database:/var/lib/ldap
+  #     - ./docker/openldap/slapd/config:/etc/ldap/slapd.d
+  #   environment:
+  #     - LDAP_ORGANISATION=example
+  #     - LDAP_DOMAIN=example.org
+  #     - LDAP_ADMIN_USERNAME=admin
+  #     - LDAP_ADMIN_PASSWORD=admin
+  #     - LDAP_CONFIG_PASSWORD=config_pass
+  #     - "LDAP_BASE_DN=dc=example,dc=org"
+  #     - LDAP_READONLY_USER=true
+  #     - LDAP_READONLY_USER_USERNAME=user
+  #     - LDAP_READONLY_USER_PASSWORD=password
 
-  phpldapadmin:
-    image: osixia/phpldapadmin:0.9.0
-    hostname: phpldapadmin
-    ports:
-      - "${PHPLDAPADMIN_PORT:-8200}:80"
-    environment:
-      - PHPLDAPADMIN_LDAP_HOSTS=openldap
-      - PHPLDAPADMIN_HTTPS=false
-    depends_on:
-      - openldap
+  # phpldapadmin:
+  #   image: osixia/phpldapadmin:0.9.0
+  #   hostname: phpldapadmin
+  #   ports:
+  #     - "${PHPLDAPADMIN_PORT:-8200}:80"
+  #   environment:
+  #     - PHPLDAPADMIN_LDAP_HOSTS=openldap
+  #     - PHPLDAPADMIN_HTTPS=false
+  #   depends_on:
+  #     - openldap
+
+  # mailpit:
+  #   image: 'axllent/mailpit:v1.7'
+  #   ports:
+  #     - '${MAILPIT_HTTP_PORT:-8025}:8025'
+  #     - '${MAILPIT_SMTP_PORT:-1025}:1025'
+
+  # rabbitmq:
+  #   image: 'rabbitmq:3-management'
+  #   ports:
+  #     - '${RABBITMQ_PORT:-5672}:5672'
+  #     - '${RABBITMQ_MANAGEMENT_PORT:-15672}:15672'
+  #   environment:
+  #     - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+  #     - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+  #     - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_VHOST}
