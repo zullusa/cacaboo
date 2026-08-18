@@ -79,15 +79,20 @@ class Providers extends EA_Controller
             $this->services_model->only($service, $this->allowed_service_fields);
         }
 
+        $providers = $this->providers_model->get();
+
+        $this->providers_model->only($providers, $this->allowed_provider_fields);
+
         script_vars([
             'user_id' => $user_id,
             'role_slug' => $role_slug,
             'services' => $services,
+            'providers' => $providers,
         ]);
 
         html_vars([
             'page_title' => lang('providers'),
-            'active_menu' => PRIV_USERS,
+            'active_menu' => PRIV_SYSTEM_SETTINGS,
             'user_display_name' => $this->accounts->get_user_display_name($user_id),
             'privileges' => $this->roles_model->get_permissions_by_slug($role_slug),
             'services' => $this->services_model->get(),

@@ -345,35 +345,47 @@ App.Pages.Providers = (function () {
      */
     function filter(keyword, selectId = null, show = false) {
         App.Http.Providers.search(keyword, filterLimit).then((response) => {
-            filterResults = response;
-
-            $filterProviders.find('.results').empty();
-            response.forEach((provider) => {
-                $('#filter-providers .results').append(App.Pages.Providers.getFilterHtml(provider)).append($('<hr/>'));
-            });
-
-            if (!response.length) {
-                $filterProviders.find('.results').append(
-                    $('<em/>', {
-                        'text': lang('no_records_found'),
-                    }),
-                );
-            } else if (response.length === filterLimit) {
-                $('<button/>', {
-                    'type': 'button',
-                    'class': 'btn btn-outline-secondary w-100 load-more text-center',
-                    'text': lang('load_more'),
-                    'click': () => {
-                        filterLimit += 20;
-                        App.Pages.Providers.filter(keyword, selectId, show);
-                    },
-                }).appendTo('#filter-providers .results');
-            }
-
-            if (selectId) {
-                App.Pages.Providers.select(selectId, show);
-            }
+            renderResults(response, keyword, selectId, show);
         });
+    }
+
+    /**
+     * Render the given provider records into the filter results list.
+     *
+     * @param {Array} response Provider records to render.
+     * @param {string} keyword The keyword that was used for the search.
+     * @param {numeric} selectId Optional, if set, when the function is complete a result row can be set as selected.
+     * @param {bool} show Optional (false), if true the selected record will be also displayed.
+     */
+    function renderResults(response, keyword, selectId = null, show = false) {
+        filterResults = response;
+
+        $filterProviders.find('.results').empty();
+        response.forEach((provider) => {
+            $('#filter-providers .results').append(App.Pages.Providers.getFilterHtml(provider)).append($('<hr/>'));
+        });
+
+        if (!response.length) {
+            $filterProviders.find('.results').append(
+                $('<em/>', {
+                    'text': lang('no_records_found'),
+                }),
+            );
+        } else if (response.length === filterLimit) {
+            $('<button/>', {
+                'type': 'button',
+                'class': 'btn btn-outline-secondary w-100 load-more text-center',
+                'text': lang('load_more'),
+                'click': () => {
+                    filterLimit += 20;
+                    App.Pages.Providers.filter(keyword, selectId, show);
+                },
+            }).appendTo('#filter-providers .results');
+        }
+
+        if (selectId) {
+            App.Pages.Providers.select(selectId, show);
+        }
     }
 
     /**
@@ -421,7 +433,15 @@ App.Pages.Providers = (function () {
      */
     function initialize() {
         App.Pages.Providers.resetForm();
-        App.Pages.Providers.filter('');
+
+        const providers = vars('providers');
+
+        if (Array.isArray(providers)) {
+            renderResults(providers, '');
+        } else {
+            App.Pages.Providers.filter('');
+        }
+
         App.Pages.Providers.addEventListeners();
 
         vars('services').forEach((service) => {
