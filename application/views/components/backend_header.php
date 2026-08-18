@@ -63,16 +63,6 @@
                 </div>
             </li>
 
-            <?php $hidden = can('view', PRIV_USERS) ? '' : 'd-none'; ?>
-            <?php $active = $active_menu == PRIV_USERS ? 'active' : ''; ?>
-            <li class="nav-item dropdown text-center <?= $active . $hidden ?>" style="min-width: 100px;">
-                <a href="<?= site_url('admins')  ?>" class="nav-link text-white fw-light py-3 px-3"
-                   data-tippy-content="<?= lang('manage_users_hint') ?>">
-                    <i class="fas fa-users me-2"></i>
-                    <?= lang('admins') ?>
-                </a>
-            </li>
-
             <?php $hidden = can('view', PRIV_SYSTEM_SETTINGS) || can('view', PRIV_USER_SETTINGS) ? '' : 'd-none'; ?>
             <?php $active = $active_menu == PRIV_SYSTEM_SETTINGS ? 'active' : ''; ?>
             <li class="nav-item dropdown text-center <?= $active . $hidden ?>" style="min-width: 100px;">

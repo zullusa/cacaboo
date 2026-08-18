@@ -89,9 +89,16 @@ class Admins extends EA_Controller
 
         $role_slug = session('role_slug');
 
+        $admins = $this->admins_model->get();
+
+        foreach ($admins as &$admin) {
+            $this->admins_model->only($admin, $this->allowed_admin_fields);
+        }
+
         script_vars([
             'user_id' => $user_id,
             'role_slug' => $role_slug,
+            'admins' => filter_sensitive_users_data($admins),
             'timezones' => $this->timezones->to_array(),
             'min_password_length' => MIN_PASSWORD_LENGTH,
             'default_language' => setting('default_language'),
@@ -100,7 +107,7 @@ class Admins extends EA_Controller
 
         html_vars([
             'page_title' => lang('admins'),
-            'active_menu' => PRIV_USERS,
+            'active_menu' => PRIV_SYSTEM_SETTINGS,
             'user_display_name' => $this->accounts->get_user_display_name($user_id),
             'grouped_timezones' => $this->timezones->to_grouped_array(),
             'privileges' => $this->roles_model->get_permissions_by_slug($role_slug),

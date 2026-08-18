@@ -3,7 +3,13 @@
 <?php section('content'); ?>
 
 <div class="container backend-page py-3" id="admins-page">
-    <div class="row" id="admins">
+    <div class="row">
+        <div class="col-sm-3">
+            <?php component('settings_nav'); ?>
+        </div>
+
+        <div class="col-sm-9">
+            <div class="row" id="admins">
         <div id="filter-admins" class="filter-records column col-12 mb-4">
             <button id="add-admin" class="btn btn-primary add-record-btn mb-4">
                 <i class="fas fa-plus-square me-2"></i>
@@ -219,6 +225,8 @@
 
                 </div>
             </div>
+        </div>
+        </div>
         </div>
     </div>
 </div>

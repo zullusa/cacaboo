@@ -398,36 +398,48 @@ App.Pages.Admins = (function () {
      */
     function filter(keyword, selectId = null, show = false) {
         App.Http.Admins.search(keyword, filterLimit).then((response) => {
-            filterResults = response;
-
-            $filterAdmins.find('.results').empty();
-
-            response.forEach((admin) => {
-                $filterAdmins.find('.results').append(App.Pages.Admins.getFilterHtml(admin)).append($('<hr/>'));
-            });
-
-            if (!response.length) {
-                $filterAdmins.find('.results').append(
-                    $('<em/>', {
-                        'text': lang('no_records_found'),
-                    }),
-                );
-            } else if (response.length === filterLimit) {
-                $('<button/>', {
-                    'type': 'button',
-                    'class': 'btn btn-outline-secondary w-100 load-more text-center',
-                    'text': lang('load_more'),
-                    'click': () => {
-                        filterLimit += 20;
-                        App.Pages.Admins.filter(keyword, selectId, show);
-                    },
-                }).appendTo('#filter-admins .results');
-            }
-
-            if (selectId) {
-                App.Pages.Admins.select(selectId, show);
-            }
+            renderResults(response, keyword, selectId, show);
         });
+    }
+
+    /**
+     * Render the given admin records into the filter results list.
+     *
+     * @param {Array} response Admin records to render.
+     * @param {string} keyword The keyword that was used for the search.
+     * @param {numeric} selectId Optional, if set, when the function is complete a result row can be set as selected.
+     * @param {bool} show Optional (false), if true the selected record will be also displayed.
+     */
+    function renderResults(response, keyword, selectId = null, show = false) {
+        filterResults = response;
+
+        $filterAdmins.find('.results').empty();
+
+        response.forEach((admin) => {
+            $filterAdmins.find('.results').append(App.Pages.Admins.getFilterHtml(admin)).append($('<hr/>'));
+        });
+
+        if (!response.length) {
+            $filterAdmins.find('.results').append(
+                $('<em/>', {
+                    'text': lang('no_records_found'),
+                }),
+            );
+        } else if (response.length === filterLimit) {
+            $('<button/>', {
+                'type': 'button',
+                'class': 'btn btn-outline-secondary w-100 load-more text-center',
+                'text': lang('load_more'),
+                'click': () => {
+                    filterLimit += 20;
+                    App.Pages.Admins.filter(keyword, selectId, show);
+                },
+            }).appendTo('#filter-admins .results');
+        }
+
+        if (selectId) {
+            App.Pages.Admins.select(selectId, show);
+        }
     }
 
     /**
@@ -490,7 +502,15 @@ App.Pages.Admins = (function () {
      */
     function initialize() {
         App.Pages.Admins.resetForm();
-        App.Pages.Admins.filter('');
+
+        const admins = vars('admins');
+
+        if (Array.isArray(admins)) {
+            renderResults(admins, '');
+        } else {
+            App.Pages.Admins.filter('');
+        }
+
         App.Pages.Admins.addEventListeners();
     }
 
