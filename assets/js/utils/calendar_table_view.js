@@ -151,10 +151,12 @@ App.Utils.CalendarTableView = (function () {
             return;
         }
 
+        const $main = $(info.el).find('.fc-event-main');
+
         $('<span/>', {
             class: 'appointment-status-emoji',
             text: getStatusEmoji(eventData.status),
-        }).appendTo(info.el);
+        }).appendTo($main.length ? $main : info.el);
     }
 
     /**
