@@ -188,6 +188,8 @@ App.Utils.CalendarTableView = (function () {
             ? '<div class="fc-event-time">' + info.timeText + '</div>'
             : '';
 
+        const notesHtml = eventData.notes ? '<br>' + App.Utils.String.escapeHtml(eventData.notes) : '';
+
         return {
             html:
                 '<div class="fc-event-main-frame">' +
@@ -197,6 +199,7 @@ App.Utils.CalendarTableView = (function () {
                 App.Utils.String.escapeHtml(info.event.title) +
                 '<br>Статус: ' +
                 renderStatusEmoji(eventData) +
+                notesHtml +
                 '</div></div></div>',
         };
     }
@@ -985,19 +988,9 @@ App.Utils.CalendarTableView = (function () {
 
                 const phoneNumber = appointment.customer.phone_number ? ' ' + appointment.customer.phone_number : '';
 
-                const providerName = appointment.provider.name;
-
-                const notes = appointment.notes ? '\n' + appointment.notes : '';
-
-                const statusLine = 'Статус: ' + getStatusEmoji(appointment.status);
-
                 const title = customerName
-                    ? customerName +
-                      phoneNumber +
-                      '\n' + appointment.service.name +
-                      '\n' + statusLine +
-                      notes
-                    : appointment.service.name + '\n' + statusLine;
+                    ? customerName + phoneNumber + '\n' + appointment.service.name
+                    : appointment.service.name;
 
                 return {
                     id: appointment.id,
@@ -1576,6 +1569,7 @@ App.Utils.CalendarTableView = (function () {
             dayHeaderFormat: columnFormat,
             selectable: true,
             selectHelper: true,
+            selectMinDistance: 5,
             themeSystem: 'bootstrap5',
             selectLongPressDelay: 100,
             headerToolbar: {

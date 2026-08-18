@@ -212,6 +212,8 @@ App.Utils.CalendarDefaultView = (function () {
             ? '<div class="fc-event-time">' + info.timeText + '</div>'
             : '';
 
+        const notesHtml = eventData.notes ? '<br>' + App.Utils.String.escapeHtml(eventData.notes) : '';
+
         return {
             html:
                 '<div class="fc-event-main-frame">' +
@@ -221,6 +223,7 @@ App.Utils.CalendarDefaultView = (function () {
                 App.Utils.String.escapeHtml(info.event.title) +
                 '<br>Статус: ' +
                 renderStatusEmoji(eventData) +
+                notesHtml +
                 '</div></div></div>',
         };
     }
@@ -976,17 +979,11 @@ App.Utils.CalendarDefaultView = (function () {
 
             const phoneNumber = appointment.customer.phone_number ? ' ' + appointment.customer.phone_number : '';
 
-            const providerName = appointment.provider.name;
-
             const serviceName = appointment.service.name;
 
-const notes = appointment.notes ? '\n' + appointment.notes : '';
-
-            const statusLine = 'Статус: ' + getStatusEmoji(appointment.status);
-
             const title = customerName
-                ? customerName + phoneNumber + '\n' + serviceName + '\n' + statusLine + notes
-                : serviceName + '\n' + statusLine;
+                ? customerName + phoneNumber + '\n' + serviceName
+                : serviceName;
 
             return {
                 id: appointment.id,
@@ -1394,6 +1391,7 @@ const notes = appointment.notes ? '\n' + appointment.notes : '';
             allDayContent: lang('all_day'),
             selectable: true,
             selectMirror: true,
+            selectMinDistance: 5,
             themeSystem: 'bootstrap5',
             selectLongPressDelay: 100,
             headerToolbar: {
