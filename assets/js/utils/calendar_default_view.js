@@ -163,6 +163,68 @@ App.Utils.CalendarDefaultView = (function () {
         return '📌';
     }
 
+    /**
+     * Check whether the given appointment status is a "notified" status.
+     *
+     * @param {string} status - Appointment status text.
+     * @returns {boolean} True if the status is a "notified" status.
+     */
+    function isNotifiedStatus(status) {
+        return /оповещ|notified|remind/i.test(status);
+    }
+
+    /**
+     * Render the appointment status emoji, composing the bell with a green
+     * checkmark overlay for the "notified" status.
+     *
+     * @param {Object} eventData - Appointment event data.
+     * @returns {string} Emoji or badge HTML for the given status.
+     */
+    function renderStatusEmoji(eventData) {
+        const emoji = getStatusEmoji(eventData.status);
+
+        if (isNotifiedStatus(eventData.status)) {
+            return (
+                '<span class="appointment-status-badge">' +
+                emoji +
+                '<span class="appointment-status-badge-overlay">✅</span>' +
+                '</span>'
+            );
+        }
+
+        return emoji;
+    }
+
+    /**
+     * Render the appointment event tile content.
+     *
+     * @param {Object} info - FullCalendar event content info.
+     * @returns {Object|null} HTML content for the event tile, or null for default rendering.
+     */
+    function onEventContent(info) {
+        const eventData = info.event.extendedProps.data;
+
+        if (isUnavailability(eventData) || !eventData?.status || info.view.type.indexOf('list') === 0) {
+            return null;
+        }
+
+        const timeHtml = info.timeText
+            ? '<div class="fc-event-time">' + info.timeText + '</div>'
+            : '';
+
+        return {
+            html:
+                '<div class="fc-event-main-frame">' +
+                timeHtml +
+                '<div class="fc-event-title-container">' +
+                '<div class="fc-event-title fc-sticky">' +
+                App.Utils.String.escapeHtml(info.event.title) +
+                '<br>Статус: ' +
+                renderStatusEmoji(eventData) +
+                '</div></div></div>',
+        };
+    }
+
     // Appointment Modal Helpers
 
     /**
@@ -439,6 +501,31 @@ App.Utils.CalendarDefaultView = (function () {
     }
 
     /**
+     * Handle calendar event mount.
+     *
+     * Bind the right click (context menu) handler that shows the event popover and the
+     * double click handler that opens the edit dialog directly.
+     *
+     * @param {Object} info - FullCalendar event info.
+     */
+    function onEventDidMount(info) {
+        if (info.view.type.indexOf('list') === 0) {
+            return;
+        }
+
+        $(info.el).on('contextmenu', (event) => {
+            event.preventDefault();
+            onEventClick(info);
+        });
+
+        $(info.el).on('dblclick', (event) => {
+            event.stopPropagation();
+            lastFocusedEventData = info.event;
+            onEditPopoverClick();
+        });
+    }
+
+    /**
      * Handle calendar event resize.
      *
      * @param {Object} info - FullCalendar event info.
@@ -671,13 +758,41 @@ App.Utils.CalendarDefaultView = (function () {
     /**
      * Handle calendar date click.
      *
+     * A single click does nothing, a double click opens the appointment creation dialog.
+     *
      * @param {Object} info - FullCalendar click info.
      */
     function onDateClick(info) {
+        if (!info.jsEvent || info.jsEvent.detail < 2) {
+            return;
+        }
+
         if (info.allDay) {
             fullCalendar.changeView('timeGridDay');
             fullCalendar.gotoDate(info.date);
+            return;
         }
+
+        openCreateAppointmentDialog(info.date);
+    }
+
+    /**
+     * Open the appointment creation dialog for the given date.
+     *
+     * @param {Date} date - Appointment start date.
+     */
+    function openCreateAppointmentDialog(date) {
+        $('#insert-appointment').trigger('click');
+
+        preselectServiceAndProvider();
+
+        const startMoment = moment(date);
+        const serviceId = $('#select-service').val();
+        const service = vars('available_services').find((s) => Number(s.id) === Number(serviceId));
+        const duration = service ? Number(service.duration) : 60;
+
+        App.Utils.UI.setDateTimePickerValue($('#start-datetime'), startMoment.toDate());
+        App.Utils.UI.setDateTimePickerValue($('#end-datetime'), startMoment.add(duration, 'minutes').toDate());
     }
 
     /**
@@ -865,7 +980,7 @@ App.Utils.CalendarDefaultView = (function () {
 
             const serviceName = appointment.service.name;
 
-            const notes = appointment.notes ? '\n' + appointment.notes : '';
+const notes = appointment.notes ? '\n' + appointment.notes : '';
 
             const statusLine = 'Статус: ' + getStatusEmoji(appointment.status);
 
@@ -1295,9 +1410,10 @@ App.Utils.CalendarDefaultView = (function () {
             windowResize: onWindowResize,
             datesSet: onDatesSet,
             dateClick: onDateClick,
-            eventClick: onEventClick,
+            eventDidMount: onEventDidMount,
             eventResize: onEventResize,
             eventDrop: onEventDrop,
+            eventContent: onEventContent,
             select: onSelect,
         });
 

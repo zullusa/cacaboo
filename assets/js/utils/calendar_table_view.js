@@ -140,6 +140,68 @@ App.Utils.CalendarTableView = (function () {
     }
 
     /**
+     * Check whether the given appointment status is a "notified" status.
+     *
+     * @param {string} status - Appointment status text.
+     * @returns {boolean} True if the status is a "notified" status.
+     */
+    function isNotifiedStatus(status) {
+        return /оповещ|notified|remind/i.test(status);
+    }
+
+    /**
+     * Render the appointment status emoji, composing the bell with a green
+     * checkmark overlay for the "notified" status.
+     *
+     * @param {Object} eventData - Appointment event data.
+     * @returns {string} Emoji or badge HTML for the given status.
+     */
+    function renderStatusEmoji(eventData) {
+        const emoji = getStatusEmoji(eventData.status);
+
+        if (isNotifiedStatus(eventData.status)) {
+            return (
+                '<span class="appointment-status-badge">' +
+                emoji +
+                '<span class="appointment-status-badge-overlay">✅</span>' +
+                '</span>'
+            );
+        }
+
+        return emoji;
+    }
+
+    /**
+     * Render the appointment event tile content.
+     *
+     * @param {Object} info - FullCalendar event content info.
+     * @returns {Object|null} HTML content for the event tile, or null for default rendering.
+     */
+    function onEventContent(info) {
+        const eventData = info.event.extendedProps.data;
+
+        if (isUnavailability(eventData) || !eventData?.status || info.view.type.indexOf('list') === 0) {
+            return null;
+        }
+
+        const timeHtml = info.timeText
+            ? '<div class="fc-event-time">' + info.timeText + '</div>'
+            : '';
+
+        return {
+            html:
+                '<div class="fc-event-main-frame">' +
+                timeHtml +
+                '<div class="fc-event-title-container">' +
+                '<div class="fc-event-title fc-sticky">' +
+                App.Utils.String.escapeHtml(info.event.title) +
+                '<br>Статус: ' +
+                renderStatusEmoji(eventData) +
+                '</div></div></div>',
+        };
+    }
+
+    /**
      * Get available providers based on user role.
      *
      * @returns {Array} Filtered providers array.
@@ -485,6 +547,31 @@ App.Utils.CalendarTableView = (function () {
     }
 
     /**
+     * Handle calendar event mount.
+     *
+     * Bind the right click (context menu) handler that shows the event popover and the
+     * double click handler that opens the edit dialog directly.
+     *
+     * @param {Object} info - FullCalendar event info.
+     */
+    function onEventDidMount(info) {
+        if (info.view.type.indexOf('list') === 0) {
+            return;
+        }
+
+        $(info.el).on('contextmenu', (event) => {
+            event.preventDefault();
+            onEventClick(info);
+        });
+
+        $(info.el).on('dblclick', (event) => {
+            event.stopPropagation();
+            lastFocusedEventData = info.event;
+            onEditPopoverClick();
+        });
+    }
+
+    /**
      * Handle calendar event resize.
      *
      * @param {Object} info - FullCalendar event info.
@@ -798,6 +885,72 @@ App.Utils.CalendarTableView = (function () {
         fullCalendar.unselect();
 
         return false;
+    }
+
+    /**
+     * Handle calendar date click.
+     *
+     * A single click does nothing, a double click opens the appointment creation dialog.
+     *
+     * @param {Object} info - FullCalendar click info.
+     */
+    function onDateClick(info) {
+        if (!info.jsEvent || info.jsEvent.detail < 2) {
+            return;
+        }
+
+        if (info.allDay) {
+            return;
+        }
+
+        const $providerColumn = $(info.jsEvent.target).parents('.provider-column');
+        const providerId = $providerColumn.data('provider').id;
+
+        openCreateAppointmentDialog(info.date, providerId);
+    }
+
+    /**
+     * Open the appointment creation dialog for the given date and provider.
+     *
+     * @param {Date} date - Appointment start date.
+     * @param {number} providerId - Provider ID.
+     */
+    function openCreateAppointmentDialog(date, providerId) {
+        $('#insert-appointment').trigger('click');
+
+        const provider = vars('available_providers').find(
+            (availableProvider) => Number(availableProvider.id) === Number(providerId),
+        );
+
+        const service = provider
+            ? vars('available_services').find((availableService) => provider.services.indexOf(availableService.id) !== -1)
+            : null;
+
+        if (service) {
+            $selectService.val(service.id);
+        }
+
+        if (!$selectService.val()) {
+            $selectService.find('option:first').prop('selected', true);
+        }
+
+        $selectService.trigger('change');
+
+        if (provider) {
+            $selectProvider.val(provider.id);
+        }
+
+        if (!$selectProvider.val()) {
+            $('#select-provider option:first').prop('selected', true);
+        }
+
+        $selectProvider.trigger('change');
+
+        const startMoment = moment(date);
+        const duration = service ? Number(service.duration) : 60;
+
+        App.Utils.UI.setDateTimePickerValue($('#start-datetime'), startMoment.toDate());
+        App.Utils.UI.setDateTimePickerValue($('#end-datetime'), startMoment.add(duration, 'minutes').toDate());
     }
 
     // Calendar Event Source Creation
@@ -1438,9 +1591,11 @@ App.Utils.CalendarTableView = (function () {
                 timeGridDay: lang('calendar'),
                 listDay: lang('list'),
             },
-            eventClick: onEventClick,
+            dateClick: onDateClick,
+            eventDidMount: onEventDidMount,
             eventResize: onEventResize,
             eventDrop: onEventDrop,
+            eventContent: onEventContent,
             select: (info) => onSelect(info, fullCalendar),
         });
 
