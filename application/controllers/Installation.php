@@ -31,7 +31,6 @@ class Installation extends EA_Controller
         $this->load->model('settings_model');
         $this->load->model('services_model');
         $this->load->model('providers_model');
-        $this->load->model('customers_model');
 
         $this->load->library('instance');
     }
@@ -203,14 +202,6 @@ class Installation extends EA_Controller
             $this->providers_model->save([
                 'name' => 'STO',
                 'services' => [$service_work_id, $service_first_id],
-            ]);
-
-            // Customer
-            $this->customers_model->save([
-                'first_name' => 'James',
-                'last_name' => 'Doe',
-                'email' => 'james@example.org',
-                'phone_number' => '+1 (000) 000-0000',
             ]);
 
             json_response([

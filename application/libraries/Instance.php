@@ -142,15 +142,6 @@ class Instance
             'services' => [$service_work_id, $service_first_id],
         ]);
 
-        // Customer
-
-        $this->CI->customers_model->save([
-            'first_name' => 'James',
-            'last_name' => 'Doe',
-            'email' => 'james@example.org',
-            'phone_number' => '+10000000000',
-        ]);
-
         return $password;
     }
 
