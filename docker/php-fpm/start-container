@@ -15,5 +15,20 @@ echo "➜ Install NPM Dependencies"
 echo "➜ Build Project Assets"
 [[ -d assets/vendor ]] || npx gulp compile
 
+echo "➜ Run Database Migrations"
+attempt=1
+max_attempts=30
+
+until php index.php console migrate; do
+    if [ "$attempt" -ge "$max_attempts" ]; then
+        echo "  Database migrations failed after $attempt attempts, continuing anyway."
+        break
+    fi
+
+    echo "  Database not ready (attempt $attempt/$max_attempts), retrying in 2 seconds..."
+    attempt=$((attempt + 1))
+    sleep 2
+done
+
 echo "➜ Listen To Incoming Requests"
 php-fpm
