@@ -222,6 +222,33 @@ class Customers_model extends EA_Model
     }
 
     /**
+     * Find a customer ID by its phone number.
+     *
+     * @param string $phone_number Phone number (digits only).
+     *
+     * @return int|null Returns the customer ID or NULL when no match was found.
+     */
+    public function find_id_by_phone_number(string $phone_number): ?int
+    {
+        $phone_number = preg_replace('/\D+/', '', $phone_number);
+
+        if (empty($phone_number)) {
+            return null;
+        }
+
+        $customer = $this->db
+            ->select('users.id')
+            ->from('users')
+            ->join('roles', 'roles.id = users.id_roles', 'inner')
+            ->where('users.phone_number', $phone_number)
+            ->where('roles.slug', DB_SLUG_CUSTOMER)
+            ->get()
+            ->row_array();
+
+        return empty($customer) ? null : (int) $customer['id'];
+    }
+
+    /**
      * Find the record ID of a customer.
      *
      * @param array $customer Associative array with the customer data.

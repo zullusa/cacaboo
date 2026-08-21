@@ -265,20 +265,9 @@ App.Components.AppointmentsModal = (function () {
             const customer = vars('customers').find((customer) => Number(customer.id) === Number(customerId));
 
             if (customer) {
-                $customerId.val(customer.id);
-                $firstName.val(customer.first_name);
-                $lastName.val(customer.last_name);
-                $email.val(customer.email);
-                $phoneNumber.val(App.Utils.Validation.phoneDigits(customer.phone_number));
-                $address.val(customer.address);
-                $city.val(customer.city);
-                $zipCode.val(customer.zip_code);
-                $customerNotes.val(customer.notes);
-                $customField1.val(customer.custom_field_1);
-                $customField2.val(customer.custom_field_2);
-                $customField3.val(customer.custom_field_3);
-                $customField4.val(customer.custom_field_4);
-                $customField5.val(customer.custom_field_5);
+                fillCustomerFields(customer);
+
+                $customerId.val(customer.id).removeData('autoSelected');
             }
 
             $selectCustomer.trigger('click'); // Hide the list.
@@ -417,7 +406,7 @@ App.Components.AppointmentsModal = (function () {
          * Event: Enter New Customer Button "Click"
          */
         $newCustomer.on('click', () => {
-            $customerId.val('');
+            $customerId.val('').removeData('autoSelected');
             $firstName.val('');
             $lastName.val('');
             $email.val('');
@@ -436,11 +425,86 @@ App.Components.AppointmentsModal = (function () {
         /**
          * Event: Customer Phone Number "Input"
          *
-         * Keep only digits and limit the length to 10 characters.
+         * Keep only digits and limit the length to 10 characters. When a known
+         * customer is matched by the phone number, their data are automatically
+         * filled in and the customer gets selected for the appointment.
          */
         $appointmentsModal.on('input', '#phone-number', (event) => {
             $(event.target).val(App.Utils.Validation.phoneDigits($(event.target).val()));
+
+            scheduleCustomerPhoneLookup($(event.target).val());
         });
+    }
+
+    let customerPhoneLookupTimeout = null;
+
+    /**
+     * Schedule a customer lookup by the provided phone number (debounced).
+     *
+     * @param {String} phone
+     */
+    function scheduleCustomerPhoneLookup(phone) {
+        if (customerPhoneLookupTimeout) {
+            clearTimeout(customerPhoneLookupTimeout);
+        }
+
+        customerPhoneLookupTimeout = setTimeout(() => lookupCustomerByPhone(phone), 500);
+    }
+
+    /**
+     * Look up a customer by the provided phone number and auto-fill the form
+     * with their data when a match is found.
+     *
+     * @param {String} phone
+     */
+    function lookupCustomerByPhone(phone) {
+        const digits = App.Utils.Validation.phoneDigits(phone || '');
+
+        if (digits.length !== 10) {
+            return;
+        }
+
+        App.Http.Customers.search(digits, 50)
+            .done((response) => {
+                const match = (response || []).find(
+                    (customer) => App.Utils.Validation.phoneDigits(customer.phone_number || '') === digits,
+                );
+
+                if (!match) {
+                    // The number does not belong to any known customer, treat it as a new
+                    // customer unless one was selected manually.
+                    if ($customerId.data('autoSelected')) {
+                        $customerId.val('').removeData('autoSelected');
+                    }
+
+                    return;
+                }
+
+                fillCustomerFields(match);
+
+                $customerId.val(match.id).data('autoSelected', true);
+            });
+    }
+
+    /**
+     * Fill the customer form fields with the provided customer data.
+     *
+     * @param {Object} customer
+     */
+    function fillCustomerFields(customer) {
+        $firstName.val(customer.first_name || '');
+        $lastName.val(customer.last_name || '');
+        $email.val(customer.email || '');
+        $phoneNumber.val(App.Utils.Validation.phoneDigits(customer.phone_number || ''));
+        $address.val(customer.address || '');
+        $city.val(customer.city || '');
+        $zipCode.val(customer.zip_code || '');
+        $customerNotes.val(customer.notes || '');
+        $customField1.val(customer.custom_field_1 || '');
+        $customField2.val(customer.custom_field_2 || '');
+        $customField3.val(customer.custom_field_3 || '');
+        $customField4.val(customer.custom_field_4 || '');
+        $customField5.val(customer.custom_field_5 || '');
     }
 
     /**
@@ -452,6 +516,7 @@ App.Components.AppointmentsModal = (function () {
     function resetModal() {
         // Empty form fields.
         $appointmentsModal.find('input, textarea').val('');
+        $customerId.removeData('autoSelected');
         $appointmentsModal.find('.modal-message').addClass('.d-none');
         $appointmentsModal.find('.is-invalid').removeClass('is-invalid');
 
