@@ -593,6 +593,7 @@ $lang['entity_secretary'] = 'Секретарь';
 $lang['entity_service'] = 'Услуга';
 $lang['entity_service_category'] = 'Категория услуг';
 $lang['entity_blocked_period'] = 'Блокировка';
+$lang['entity_setting'] = 'Настройка';
 $lang['audit_changes_added'] = 'Добавлено';
 $lang['audit_changes_changed'] = 'Изменено';
 $lang['audit_changes_deleted'] = 'Удалено';

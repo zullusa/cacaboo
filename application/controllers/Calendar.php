@@ -88,6 +88,7 @@ class Calendar extends EA_Controller
         $this->load->library('webhooks_client');
         $this->load->library('permissions');
         $this->load->library('jitsi_client');
+        $this->load->library('audit');
     }
 
     /**
@@ -373,6 +374,11 @@ class Calendar extends EA_Controller
                     $appointment['meeting_link'] = $this->jitsi_client->generate_link();
                 }
 
+                $old_appointment =
+                    $manage_mode && !empty($appointment['id'])
+                        ? $this->appointments_model->find($appointment['id'])
+                        : [];
+
                 $this->appointments_model->only($appointment, $this->allowed_appointment_fields);
 
                 $this->appointments_model->optional($appointment, $this->optional_appointment_fields);
@@ -388,6 +394,21 @@ class Calendar extends EA_Controller
             $provider = $this->providers_model->find($appointment['id_users_provider']);
             $customer = $this->customers_model->find($appointment['id_users_customer']);
             $service = $this->services_model->find($appointment['id_services']);
+
+            $appointment_name = trim($service['name'] . ', ' . ($appointment['start_datetime'] ?? ''), ', ');
+
+            if ($manage_mode) {
+                $this->audit->track(
+                    'updated',
+                    'appointment',
+                    (int) $appointment['id'],
+                    $appointment_name,
+                    $appointment,
+                    $old_appointment ?? [],
+                );
+            } else {
+                $this->audit->track('created', 'appointment', (int) $appointment['id'], $appointment_name, $appointment);
+            }
 
             $company_color = setting('company_color');
 
@@ -493,6 +514,15 @@ class Calendar extends EA_Controller
             // Delete appointment record from the database.
             $this->appointments_model->delete($appointment_id);
 
+            $this->audit->track(
+                'deleted',
+                'appointment',
+                (int) $appointment_id,
+                trim(($service['name'] ?? '') . ', ' . ($appointment['start_datetime'] ?? ''), ', '),
+                [],
+                $appointment,
+            );
+
             if ($notify_users) {
                 $this->notifications->notify_appointment_deleted(
                     $appointment,
@@ -543,9 +573,22 @@ class Calendar extends EA_Controller
 
             $provider = $this->providers_model->find($provider_id);
 
+            $is_update = !empty($unavailability['id']);
+
+            $old_unavailability = $is_update ? $this->unavailabilities_model->find($unavailability['id']) : [];
+
             $unavailability_id = $this->unavailabilities_model->save($unavailability);
 
             $unavailability = $this->unavailabilities_model->find($unavailability_id);
+
+            $this->audit->track(
+                $is_update ? 'updated' : 'created',
+                'unavailability',
+                (int) $unavailability_id,
+                trim(($unavailability['notes'] ?? '') . ', ' . ($unavailability['start_datetime'] ?? ''), ', ') ?: ('#' . $unavailability_id),
+                $unavailability,
+                $old_unavailability,
+            );
 
             $this->synchronization->sync_unavailability_saved($unavailability, $provider);
 
@@ -582,6 +625,15 @@ class Calendar extends EA_Controller
             $provider = $this->providers_model->find($unavailability['id_users_provider']);
 
             $this->unavailabilities_model->delete($unavailability_id);
+
+            $this->audit->track(
+                'deleted',
+                'unavailability',
+                (int) $unavailability_id,
+                trim(($unavailability['notes'] ?? '') . ', ' . ($unavailability['start_datetime'] ?? ''), ', ') ?: ('#' . $unavailability_id),
+                [],
+                $unavailability,
+            );
 
             $this->synchronization->sync_unavailability_deleted($unavailability, $provider);
 

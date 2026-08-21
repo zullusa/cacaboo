@@ -168,6 +168,7 @@ App.Pages.Audit = (function () {
             service: lang('entity_service'),
             service_category: lang('entity_service_category'),
             blocked_period: lang('entity_blocked_period'),
+            setting: lang('entity_setting'),
         };
 
         return labels[entityType] || entityType;
