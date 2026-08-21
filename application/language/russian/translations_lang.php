@@ -578,5 +578,24 @@ $lang['about_app_premium'] = 'Мы предлагаем комплексные �
 $lang['go_premium'] = 'Перейти на Premium';
 $lang['notify_users_on_create_question'] = 'Хотите уведомить клиента о новой записи?';
 $lang['notify_users_on_delete_question'] = 'Хотите уведомить клиента об отмене записи?';
+
+// Audit
+$lang['audit'] = 'История действий';
+$lang['action_created'] = 'Создание';
+$lang['action_updated'] = 'Изменение';
+$lang['action_deleted'] = 'Удаление';
+$lang['entity_appointment'] = 'Запись';
+$lang['entity_unavailability'] = 'Недоступность';
+$lang['entity_customer'] = 'Клиент';
+$lang['entity_provider'] = 'Исполнитель';
+$lang['entity_admin'] = 'Администратор';
+$lang['entity_secretary'] = 'Секретарь';
+$lang['entity_service'] = 'Услуга';
+$lang['entity_service_category'] = 'Категория услуг';
+$lang['entity_blocked_period'] = 'Блокировка';
+$lang['audit_changes_added'] = 'Добавлено';
+$lang['audit_changes_changed'] = 'Изменено';
+$lang['audit_changes_deleted'] = 'Удалено';
+
 // End
 $lang['providers'] = 'Исполнители';

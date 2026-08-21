@@ -39,6 +39,7 @@ class Blocked_periods extends EA_Controller
         $this->load->library('accounts');
         $this->load->library('timezones');
         $this->load->library('webhooks_client');
+        $this->load->library('audit');
     }
 
     /**
@@ -143,6 +144,8 @@ class Blocked_periods extends EA_Controller
 
             $blocked_period = $this->blocked_periods_model->find($blocked_period_id);
 
+            $this->audit->track('created', 'blocked_period', $blocked_period_id, $this->blocked_period_name($blocked_period), $blocked_period);
+
             $this->webhooks_client->trigger(WEBHOOK_BLOCKED_PERIOD_SAVE, $blocked_period);
 
             json_response([
@@ -203,6 +206,8 @@ class Blocked_periods extends EA_Controller
 
             $blocked_period = request('blocked_period');
 
+            $old_blocked_period = $this->blocked_periods_model->find($blocked_period['id']);
+
             $this->blocked_periods_model->only($blocked_period, $this->allowed_blocked_period_fields);
 
             $this->blocked_periods_model->optional($blocked_period, $this->optional_blocked_period_fields);
@@ -210,6 +215,8 @@ class Blocked_periods extends EA_Controller
             $blocked_period_id = $this->blocked_periods_model->save($blocked_period);
 
             $blocked_period = $this->blocked_periods_model->find($blocked_period_id);
+
+            $this->audit->track('updated', 'blocked_period', $blocked_period_id, $this->blocked_period_name($blocked_period), $blocked_period, $old_blocked_period);
 
             $this->webhooks_client->trigger(WEBHOOK_BLOCKED_PERIOD_SAVE, $blocked_period);
 
@@ -251,6 +258,8 @@ class Blocked_periods extends EA_Controller
 
             $this->blocked_periods_model->delete($blocked_period_id);
 
+            $this->audit->track('deleted', 'blocked_period', (int) $blocked_period_id, $this->blocked_period_name($blocked_period), [], $blocked_period);
+
             $this->webhooks_client->trigger(WEBHOOK_BLOCKED_PERIOD_DELETE, $blocked_period);
 
             json_response([
@@ -259,5 +268,13 @@ class Blocked_periods extends EA_Controller
         } catch (Throwable $e) {
             json_exception($e);
         }
+    }
+
+    /**
+     * Build the display name of a blocked period for the audit log.
+     */
+    private function blocked_period_name(array $blocked_period): string
+    {
+        return trim(($blocked_period['name'] ?? '') . ', ' . ($blocked_period['start_datetime'] ?? ''), ', ') ?: ('#' . ($blocked_period['id'] ?? ''));
     }
 }

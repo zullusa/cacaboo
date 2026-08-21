@@ -53,6 +53,7 @@ class Services extends EA_Controller
         $this->load->library('accounts');
         $this->load->library('timezones');
         $this->load->library('webhooks_client');
+        $this->load->library('audit');
     }
 
     /**
@@ -164,6 +165,8 @@ class Services extends EA_Controller
 
             $service = $this->services_model->find($service_id);
 
+            $this->audit->track('created', 'service', $service_id, (string) $service['name'], $service);
+
             $this->webhooks_client->trigger(WEBHOOK_SERVICE_SAVE, $service);
 
             json_response([
@@ -220,6 +223,8 @@ class Services extends EA_Controller
 
             $service = request('service');
 
+            $old_service = $this->services_model->find($service['id']);
+
             $this->services_model->only($service, $this->allowed_service_fields);
 
             $this->services_model->optional($service, $this->optional_service_fields);
@@ -227,6 +232,8 @@ class Services extends EA_Controller
             $service_id = $this->services_model->save($service);
 
             $service = $this->services_model->find($service_id);
+
+            $this->audit->track('updated', 'service', $service_id, (string) $service['name'], $service, $old_service);
 
             $this->webhooks_client->trigger(WEBHOOK_SERVICE_SAVE, $service);
 
@@ -263,6 +270,8 @@ class Services extends EA_Controller
             $service = $this->services_model->find($service_id);
 
             $this->services_model->delete($service_id);
+
+            $this->audit->track('deleted', 'service', (int) $service_id, (string) $service['name'], [], $service);
 
             $this->webhooks_client->trigger(WEBHOOK_SERVICE_DELETE, $service);
 

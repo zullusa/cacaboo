@@ -57,6 +57,7 @@ class Appointments extends EA_Controller
         $this->load->library('accounts');
         $this->load->library('timezones');
         $this->load->library('webhooks_client');
+        $this->load->library('audit');
     }
 
     /**
@@ -174,6 +175,16 @@ class Appointments extends EA_Controller
 
             $appointment = $this->appointments_model->find($appointment_id);
 
+            $this->appointments_model->load($appointment, ['service']);
+
+            $this->audit->track(
+                'created',
+                'appointment',
+                $appointment_id,
+                $this->appointment_name($appointment),
+                $appointment,
+            );
+
             $this->webhooks_client->trigger(WEBHOOK_APPOINTMENT_SAVE, $appointment);
 
             json_response([
@@ -244,6 +255,8 @@ class Appointments extends EA_Controller
                 $this->check_appointment_access((int) $appointment['id']);
             }
 
+            $old_appointment = !empty($appointment['id']) ? $this->appointments_model->find($appointment['id']) : [];
+
             if ($role_slug === DB_SLUG_PROVIDER) {
                 $appointment['id_users_provider'] = $user_id;
             }
@@ -253,6 +266,17 @@ class Appointments extends EA_Controller
             $this->appointments_model->optional($appointment, $this->optional_appointment_fields);
 
             $appointment_id = $this->appointments_model->save($appointment);
+
+            $new_appointment = $this->appointments_model->find($appointment_id);
+
+            $this->audit->track(
+                'updated',
+                'appointment',
+                $appointment_id,
+                $this->appointment_name($new_appointment),
+                $new_appointment,
+                $old_appointment,
+            );
 
             json_response([
                 'success' => true,
@@ -290,6 +314,8 @@ class Appointments extends EA_Controller
 
             $this->appointments_model->delete($appointment_id);
 
+            $this->audit->track('deleted', 'appointment', (int) $appointment_id, $this->appointment_name($appointment), [], $appointment);
+
             $this->webhooks_client->trigger(WEBHOOK_APPOINTMENT_DELETE, $appointment);
 
             json_response([
@@ -320,5 +346,17 @@ class Appointments extends EA_Controller
         if ($role_slug === DB_SLUG_PROVIDER && $user_id !== $provider_id) {
             abort(403, 'Forbidden');
         }
+    }
+
+    /**
+     * Build the display name of an appointment for the audit log.
+     */
+    private function appointment_name(array $appointment): string
+    {
+        if (!empty($appointment['service']['name'])) {
+            return trim($appointment['service']['name'] . ', ' . ($appointment['start_datetime'] ?? ''), ', ');
+        }
+
+        return '#' . ($appointment['id'] ?? '');
     }
 }

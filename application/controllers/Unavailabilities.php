@@ -47,6 +47,7 @@ class Unavailabilities extends EA_Controller
         $this->load->library('accounts');
         $this->load->library('timezones');
         $this->load->library('webhooks_client');
+        $this->load->library('audit');
     }
 
     /**
@@ -133,6 +134,8 @@ class Unavailabilities extends EA_Controller
 
             $unavailability = $this->unavailabilities_model->find($unavailability_id);
 
+            $this->audit->track('created', 'unavailability', $unavailability_id, $this->unavailability_name($unavailability), $unavailability);
+
             $provider = $this->providers_model->find($unavailability['id_users_provider']);
 
             $this->synchronization->sync_unavailability_saved($unavailability, $provider);
@@ -203,6 +206,8 @@ class Unavailabilities extends EA_Controller
                 $this->check_unavailability_access((int) $unavailability['id']);
             }
 
+            $old_unavailability = !empty($unavailability['id']) ? $this->unavailabilities_model->find($unavailability['id']) : [];
+
             $this->unavailabilities_model->only($unavailability, $this->allowed_unavailability_fields);
 
             $this->unavailabilities_model->optional($unavailability, $this->optional_unavailability_fields);
@@ -210,6 +215,8 @@ class Unavailabilities extends EA_Controller
             $unavailability_id = $this->unavailabilities_model->save($unavailability);
 
             $unavailability = $this->unavailabilities_model->find($unavailability_id);
+
+            $this->audit->track('updated', 'unavailability', $unavailability_id, $this->unavailability_name($unavailability), $unavailability, $old_unavailability);
 
             $provider = $this->providers_model->find($unavailability['id_users_provider']);
 
@@ -257,6 +264,8 @@ class Unavailabilities extends EA_Controller
 
             $this->unavailabilities_model->delete($unavailability_id);
 
+            $this->audit->track('deleted', 'unavailability', (int) $unavailability_id, $this->unavailability_name($unavailability), [], $unavailability);
+
             $this->webhooks_client->trigger(WEBHOOK_UNAVAILABILITY_DELETE, $unavailability);
 
             json_response([
@@ -287,5 +296,13 @@ class Unavailabilities extends EA_Controller
         if ($role_slug === DB_SLUG_PROVIDER && $user_id !== $provider_id) {
             abort(403, 'Forbidden');
         }
+    }
+
+    /**
+     * Build the display name of an unavailability for the audit log.
+     */
+    private function unavailability_name(array $unavailability): string
+    {
+        return trim(($unavailability['notes'] ?? '') . ', ' . ($unavailability['start_datetime'] ?? ''), ', ') ?: ('#' . ($unavailability['id'] ?? ''));
     }
 }

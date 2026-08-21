@@ -61,6 +61,7 @@ class Customers extends EA_Controller
         $this->load->library('permissions');
         $this->load->library('timezones');
         $this->load->library('webhooks_client');
+        $this->load->library('audit');
     }
 
     /**
@@ -298,6 +299,8 @@ class Customers extends EA_Controller
 
             $customer = $this->customers_model->find($customer_id);
 
+            $this->audit->track('created', 'customer', $customer_id, trim($customer['first_name'] . ' ' . $customer['last_name']), $customer);
+
             $this->webhooks_client->trigger(WEBHOOK_CUSTOMER_SAVE, $customer);
 
             json_response([
@@ -333,6 +336,8 @@ class Customers extends EA_Controller
 
             $customer['timezone'] = 'Europe/Moscow';
 
+            $old_customer = $this->customers_model->find($customer['id']);
+
             $this->customers_model->only($customer, $this->allowed_customer_fields);
 
             $this->customers_model->optional($customer, $this->optional_customer_fields);
@@ -340,6 +345,8 @@ class Customers extends EA_Controller
             $customer_id = $this->customers_model->save($customer);
 
             $customer = $this->customers_model->find($customer_id);
+
+            $this->audit->track('updated', 'customer', $customer_id, trim($customer['first_name'] . ' ' . $customer['last_name']), $customer, $old_customer);
 
             $this->webhooks_client->trigger(WEBHOOK_CUSTOMER_SAVE, $customer);
 
@@ -382,6 +389,8 @@ class Customers extends EA_Controller
             $customer = $this->customers_model->find($customer_id);
 
             $this->customers_model->delete($customer_id);
+
+            $this->audit->track('deleted', 'customer', (int) $customer_id, trim($customer['first_name'] . ' ' . $customer['last_name']), [], $customer);
 
             $this->webhooks_client->trigger(WEBHOOK_CUSTOMER_DELETE, $customer);
 

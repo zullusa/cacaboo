@@ -45,6 +45,7 @@ class Providers extends EA_Controller
 
         $this->load->library('accounts');
         $this->load->library('webhooks_client');
+        $this->load->library('audit');
     }
 
     /**
@@ -158,6 +159,8 @@ class Providers extends EA_Controller
 
             $provider = $this->providers_model->find($provider_id);
 
+            $this->audit->track('created', 'provider', $provider_id, (string) $provider['name'], $provider);
+
             $this->webhooks_client->trigger(WEBHOOK_PROVIDER_SAVE, $provider);
 
             json_response([
@@ -214,6 +217,8 @@ class Providers extends EA_Controller
 
             $provider = request('provider');
 
+            $old_provider = $this->providers_model->find($provider['id']);
+
             $this->providers_model->only($provider, $this->allowed_provider_fields);
 
             $this->providers_model->optional($provider, $this->optional_provider_fields);
@@ -221,6 +226,8 @@ class Providers extends EA_Controller
             $provider_id = $this->providers_model->save($provider);
 
             $provider = $this->providers_model->find($provider_id);
+
+            $this->audit->track('updated', 'provider', $provider_id, (string) $provider['name'], $provider, $old_provider);
 
             $this->webhooks_client->trigger(WEBHOOK_PROVIDER_SAVE, $provider);
 
@@ -257,6 +264,8 @@ class Providers extends EA_Controller
             $provider = $this->providers_model->find($provider_id);
 
             $this->providers_model->delete($provider_id);
+
+            $this->audit->track('deleted', 'provider', (int) $provider_id, (string) $provider['name'], [], $provider);
 
             $this->webhooks_client->trigger(WEBHOOK_PROVIDER_DELETE, $provider);
 

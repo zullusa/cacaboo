@@ -66,6 +66,7 @@ class Secretaries extends EA_Controller
         $this->load->library('accounts');
         $this->load->library('timezones');
         $this->load->library('webhooks_client');
+        $this->load->library('audit');
     }
 
     /**
@@ -183,6 +184,8 @@ class Secretaries extends EA_Controller
 
             $secretary = $this->secretaries_model->find($secretary_id);
 
+            $this->audit->track('created', 'secretary', $secretary_id, trim($secretary['first_name'] . ' ' . $secretary['last_name']), $secretary);
+
             $this->webhooks_client->trigger(WEBHOOK_SECRETARY_SAVE, $secretary);
 
             json_response([
@@ -239,6 +242,8 @@ class Secretaries extends EA_Controller
 
             $secretary = request('secretary');
 
+            $old_secretary = $this->secretaries_model->find($secretary['id']);
+
             $this->secretaries_model->only($secretary, $this->allowed_secretary_fields);
 
             $this->secretaries_model->only($secretary['settings'], $this->allowed_secretary_setting_fields);
@@ -248,6 +253,8 @@ class Secretaries extends EA_Controller
             $secretary_id = $this->secretaries_model->save($secretary);
 
             $secretary = $this->secretaries_model->find($secretary_id);
+
+            $this->audit->track('updated', 'secretary', $secretary_id, trim($secretary['first_name'] . ' ' . $secretary['last_name']), $secretary, $old_secretary);
 
             $this->webhooks_client->trigger(WEBHOOK_SECRETARY_SAVE, $secretary);
 
@@ -284,6 +291,8 @@ class Secretaries extends EA_Controller
             $secretary = $this->secretaries_model->find($secretary_id);
 
             $this->secretaries_model->delete($secretary_id);
+
+            $this->audit->track('deleted', 'secretary', (int) $secretary_id, trim($secretary['first_name'] . ' ' . $secretary['last_name']), [], $secretary);
 
             $this->webhooks_client->trigger(WEBHOOK_SECRETARY_DELETE, $secretary);
 

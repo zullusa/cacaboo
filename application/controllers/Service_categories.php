@@ -37,6 +37,7 @@ class Service_categories extends EA_Controller
         $this->load->library('accounts');
         $this->load->library('timezones');
         $this->load->library('webhooks_client');
+        $this->load->library('audit');
     }
 
     /**
@@ -138,6 +139,8 @@ class Service_categories extends EA_Controller
 
             $service_category = $this->service_categories_model->find($service_category_id);
 
+            $this->audit->track('created', 'service_category', $service_category_id, (string) $service_category['name'], $service_category);
+
             $this->webhooks_client->trigger(WEBHOOK_SERVICE_CATEGORY_SAVE, $service_category);
 
             json_response([
@@ -198,6 +201,8 @@ class Service_categories extends EA_Controller
 
             $service_category = request('service_category');
 
+            $old_service_category = $this->service_categories_model->find($service_category['id']);
+
             $this->service_categories_model->only($service_category, $this->allowed_service_category_fields);
 
             $this->service_categories_model->optional($service_category, $this->optional_service_category_fields);
@@ -205,6 +210,8 @@ class Service_categories extends EA_Controller
             $service_category_id = $this->service_categories_model->save($service_category);
 
             $service_category = $this->service_categories_model->find($service_category_id);
+
+            $this->audit->track('updated', 'service_category', $service_category_id, (string) $service_category['name'], $service_category, $old_service_category);
 
             $this->webhooks_client->trigger(WEBHOOK_SERVICE_CATEGORY_SAVE, $service_category);
 
@@ -245,6 +252,8 @@ class Service_categories extends EA_Controller
             $service_category = $this->service_categories_model->find($service_category_id);
 
             $this->service_categories_model->delete($service_category_id);
+
+            $this->audit->track('deleted', 'service_category', (int) $service_category_id, (string) $service_category['name'], [], $service_category);
 
             $this->webhooks_client->trigger(WEBHOOK_SERVICE_CATEGORY_DELETE, $service_category);
 

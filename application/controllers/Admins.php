@@ -61,6 +61,7 @@ class Admins extends EA_Controller
         $this->load->library('accounts');
         $this->load->library('timezones');
         $this->load->library('webhooks_client');
+        $this->load->library('audit');
     }
 
     /**
@@ -177,6 +178,8 @@ class Admins extends EA_Controller
 
             $admin = $this->admins_model->find($admin_id);
 
+            $this->audit->track('created', 'admin', $admin_id, trim($admin['first_name'] . ' ' . $admin['last_name']), $admin);
+
             $this->webhooks_client->trigger(WEBHOOK_ADMIN_SAVE, $admin);
 
             json_response([
@@ -233,6 +236,8 @@ class Admins extends EA_Controller
 
             $admin = request('admin');
 
+            $old_admin = $this->admins_model->find($admin['id']);
+
             $this->admins_model->only($admin, $this->allowed_admin_fields);
 
             $this->admins_model->optional($admin, $this->optional_admin_fields);
@@ -244,6 +249,8 @@ class Admins extends EA_Controller
             $admin_id = $this->admins_model->save($admin);
 
             $admin = $this->admins_model->find($admin_id);
+
+            $this->audit->track('updated', 'admin', $admin_id, trim($admin['first_name'] . ' ' . $admin['last_name']), $admin, $old_admin);
 
             $this->webhooks_client->trigger(WEBHOOK_ADMIN_SAVE, $admin);
 
@@ -285,6 +292,8 @@ class Admins extends EA_Controller
             $admin = $this->admins_model->find($admin_id);
 
             $this->admins_model->delete($admin_id);
+
+            $this->audit->track('deleted', 'admin', (int) $admin_id, trim($admin['first_name'] . ' ' . $admin['last_name']), [], $admin);
 
             $this->webhooks_client->trigger(WEBHOOK_ADMIN_DELETE, $admin);
 
