@@ -93,7 +93,7 @@ class Audit
                 'entity_type' => $entity_type,
                 'entity_id' => $entity_id ?: null,
                 'entity_name' => mb_substr($entity_name, 0, 512),
-                'changes' => $changes,
+                'changes' => $this->mask_changes($entity_type, $entity_name, $changes),
             ]);
         } catch (Throwable $e) {
             log_message('error', 'Audit tracking failed: ' . $e->getMessage());
@@ -118,6 +118,39 @@ class Audit
         } catch (Throwable $e) {
             return '#' . $user_id;
         }
+    }
+
+    /**
+     * Mask sensitive values in the changes map before it gets stored.
+     *
+     * The comparison of the values happens on the raw data, only the stored
+     * changes are masked (e.g. the value of the "api_token" setting).
+     *
+     * @param string $entity_type Entity type.
+     * @param string $entity_name Entity name.
+     * @param array $changes Changes map.
+     *
+     * @return array
+     */
+    protected function mask_changes(string $entity_type, string $entity_name, array $changes): array
+    {
+        if ($entity_type !== 'setting' || !preg_match('/token|secret|password|salt|hmac|_key/i', $entity_name)) {
+            return $changes;
+        }
+
+        foreach (['added', 'deleted'] as $section) {
+            if (array_key_exists('value', $changes[$section] ?? [])) {
+                $changes[$section]['value'] = '***';
+            }
+        }
+
+        foreach ($changes['changed'] as $field => &$pair) {
+            if ($field === 'value') {
+                $pair = ['from' => '***', 'to' => '***'];
+            }
+        }
+
+        return $changes;
     }
 
     /**

@@ -48,11 +48,34 @@ class Settings_model extends EA_Model
     {
         $this->validate($setting);
 
-        if (empty($setting['id'])) {
-            return $this->insert($setting);
+        $is_update = !empty($setting['id']);
+
+        $old_setting = $this->db
+            ->get_where('settings', $is_update ? ['id' => $setting['id']] : ['name' => $setting['name']])
+            ->row_array();
+
+        if ($is_update) {
+            $setting_id = $this->update($setting);
+
+            $this->audit_track(
+                'updated',
+                $setting_id,
+                (string) $setting['name'],
+                array_merge($old_setting ?: [], $setting),
+                $old_setting ?: [],
+            );
         } else {
-            return $this->update($setting);
+            $setting_id = $this->insert($setting);
+
+            $this->audit_track(
+                'created',
+                $setting_id,
+                (string) $setting['name'],
+                array_merge($old_setting ?: [], $setting, ['id' => $setting_id]),
+            );
         }
+
+        return $setting_id;
     }
 
     /**
@@ -131,7 +154,35 @@ class Settings_model extends EA_Model
      */
     public function delete(int $setting_id): void
     {
+        $setting = $this->db->get_where('settings', ['id' => $setting_id])->row_array();
+
         $this->db->delete('settings', ['id' => $setting_id]);
+
+        if (!empty($setting)) {
+            $this->audit_track('deleted', (int) $setting_id, (string) $setting['name'], [], $setting);
+        }
+    }
+
+    /**
+     * Track a setting change into the audit log.
+     *
+     * @param string $action Either "created", "updated" or "deleted".
+     * @param int $setting_id Setting ID.
+     * @param string $name Setting name.
+     * @param array $new_data New setting data.
+     * @param array $old_data Old setting data.
+     */
+    protected function audit_track(string $action, int $setting_id, string $name, array $new_data, array $old_data = []): void
+    {
+        try {
+            $CI = get_instance();
+
+            $CI->load->library('audit');
+
+            $CI->audit->track($action, 'setting', $setting_id, $name, $new_data, $old_data);
+        } catch (Throwable $e) {
+            log_message('error', 'Settings audit tracking failed: ' . $e->getMessage());
+        }
     }
 
     /**
