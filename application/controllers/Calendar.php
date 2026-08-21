@@ -455,6 +455,110 @@ class Calendar extends EA_Controller
         }
     }
 
+    /**
+     * Send a reminder notification for an appointment right away.
+     *
+     * Builds the same payload as the reminder worker does for the one day
+     * ahead reminders and publishes it to the notifications queue. Only
+     * appointments that start in less than 24 hours can be notified.
+     */
+    public function notify_appointment(): void
+    {
+        try {
+            method('post');
+
+            if (cannot('edit', PRIV_APPOINTMENTS)) {
+                abort(403, 'Forbidden');
+            }
+
+            check('appointment_id', 'numeric');
+
+            $appointment_id = (int) request('appointment_id');
+
+            $appointment = $this->appointments_model->find($appointment_id);
+
+            if (!empty($appointment['is_unavailability'])) {
+                json_response(['success' => false, 'message' => lang('reminder_not_available')]);
+                return;
+            }
+
+            $this->check_event_permissions((int) $appointment['id_users_provider']);
+
+            $start = new DateTimeImmutable($appointment['start_datetime']);
+
+            $hours_until_start = ((new DateTimeImmutable())->getTimestamp() - $start->getTimestamp()) / -3600;
+
+            if ($hours_until_start <= 0 || $hours_until_start >= 24) {
+                json_response(['success' => false, 'message' => lang('reminder_not_available')]);
+                return;
+            }
+
+            $customer = $this->customers_model->find($appointment['id_users_customer']);
+
+            $phone = trim((string) ($customer['phone_number'] ?: $customer['mobile_number'] ?? ''));
+
+            if ($phone !== '' && !str_starts_with($phone, '+')) {
+                $phone = config('reminder_phone_prefix') . $phone;
+            }
+
+            $payload = [
+                'type' => config('reminder_type'),
+                'appointment_id' => $appointment_id,
+                'phone' => $phone,
+                'email' => (string) ($customer['email'] ?? ''),
+                'subject' => config('reminder_subject'),
+                'message' => sprintf(
+                    'Добрый день! Напоминаем, что вы записаны на СТО по адресу %s в %s %s. Телефон для связи с нами %s.',
+                    config('reminder_address'),
+                    $start->format('H:i'),
+                    $start->format('d.m.Y'),
+                    config('reminder_contact_phone'),
+                ),
+                'offset_days' => 1,
+            ];
+
+            $this->load->library('rabbitmq');
+
+            if (!$this->rabbitmq->publish_notification($payload)) {
+                json_response(['success' => false, 'message' => lang('service_communication_error')]);
+                return;
+            }
+
+            $this->mark_reminder_sent($appointment_id);
+
+            json_response(['success' => true]);
+        } catch (Throwable $e) {
+            json_exception($e);
+        }
+    }
+
+    /**
+     * Store the "sent" marker of a manual reminder so that the reminder worker
+     * does not send the one day ahead reminder for the same appointment again.
+     */
+    private function mark_reminder_sent(int $appointment_id): void
+    {
+        $table = $this->db->dbprefix('reminder_log');
+
+        try {
+            $this->db->query(
+                "CREATE TABLE IF NOT EXISTS `{$table}` (
+                    `appointment_id` BIGINT UNSIGNED NOT NULL,
+                    `offset_days` TINYINT UNSIGNED NOT NULL,
+                    `sent_at` DATETIME NOT NULL,
+                    PRIMARY KEY (`appointment_id`, `offset_days`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            );
+
+            $this->db->query(
+                "INSERT IGNORE INTO `{$table}` (`appointment_id`, `offset_days`, `sent_at`) VALUES (?, 1, ?)",
+                [$appointment_id, date('Y-m-d H:i:s')],
+            );
+        } catch (Throwable $e) {
+            log_message('error', 'Calendar - Could not mark reminder as sent: ' . $e->getMessage());
+        }
+    }
+
     private function check_event_permissions(int $provider_id): void
     {
         $user_id = (int) session('user_id');

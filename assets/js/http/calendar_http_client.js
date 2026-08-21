@@ -88,12 +88,28 @@ App.Http.Calendar = (function () {
     }
 
     /**
+     * Send a reminder notification for an appointment right away.
+     *
+     * @param {Number} appointmentId
+     *
+     * @return {*|jQuery}
+     */
+    function notifyAppointment(appointmentId) {
+        const url = App.Utils.Url.siteUrl('calendar/notify_appointment');
+
+        const data = {
+            csrf_token: vars('csrf_token'),
+            appointment_id: appointmentId,
+        };
+
+        return $.post(url, data);
+    }
+
+    /**
      * Save unavailability period to database.
      *
      * @param {Object} unavailability Contains the unavailability period data.
      * @param {Function} [successCallback] The ajax success callback function.
-     * @param {Function} [errorCallback] The ajax failure callback function.
-     *
      * @return {*|jQuery}
      */
     function saveUnavailability(unavailability, successCallback, errorCallback) {
@@ -103,7 +119,6 @@ App.Http.Calendar = (function () {
             csrf_token: vars('csrf_token'),
             unavailability: unavailability,
         };
-
         return $.post(url, data)
             .done((response) => {
                 if (successCallback) {
@@ -307,6 +322,7 @@ App.Http.Calendar = (function () {
         saveAppointment,
         saveAppointmentWithConflictHandling,
         deleteAppointment,
+        notifyAppointment,
         saveUnavailability,
         deleteUnavailability,
         saveWorkingPlanException,

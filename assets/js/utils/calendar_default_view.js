@@ -407,6 +407,30 @@ App.Utils.CalendarDefaultView = (function () {
     }
 
     /**
+     * Handle popover notify button click - send a reminder right away.
+     */
+    function onNotifyPopoverClick() {
+        const data = lastFocusedEventData?.extendedProps?.data;
+
+        closePopover();
+
+        if (!data || !data.id) {
+            return;
+        }
+
+        App.Http.Calendar.notifyAppointment(data.id)
+            .done((response) => {
+                App.Layouts.Backend.displayNotification(
+                    response?.success ? lang('reminder_sent') : lang('reminder_not_available'),
+                );
+                $reloadAppointments.trigger('click');
+            })
+            .fail(() => {
+                App.Layouts.Backend.displayNotification(lang('service_communication_error'));
+            });
+    }
+
+    /**
      * Show appointment deletion confirmation dialog.
      *
      * @param {number} appointmentId - Appointment ID to delete.
@@ -1247,6 +1271,9 @@ App.Utils.CalendarDefaultView = (function () {
 
         // Popover delete button
         $calendarPage.on('click', '.delete-popover', onDeletePopoverClick);
+
+        // Popover notify button
+        $calendarPage.on('click', '.notify-popover', onNotifyPopoverClick);
 
         // Filter change
         $selectFilterItem.on('change', () => {

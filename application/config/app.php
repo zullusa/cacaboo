@@ -16,4 +16,4 @@ $config['url'] = getenv('BASE_URL') ?: 'http://localhost';
 $debug_mode = getenv('DEBUG_MODE');
 $config['debug'] = $debug_mode === false ? false : filter_var($debug_mode, FILTER_VALIDATE_BOOLEAN);
 
-$config['cache_busting_token'] = 'TSJ87';
+$config['cache_busting_token'] = 'TSJ89';

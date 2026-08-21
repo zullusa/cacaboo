@@ -36,3 +36,10 @@ $config['rabbitmq_vhost'] = getenv('RABBITMQ_VHOST') ?: '/';
 $config['rabbitmq_queue'] = getenv('RABBITMQ_QUEUE') ?: 'notifications';
 $config['rabbitmq_exchange'] = getenv('RABBITMQ_EXCHANGE') ?: 'notifications_exchange';
 $config['rabbitmq_routing_key'] = getenv('RABBITMQ_ROUTING_KEY') ?: 'notifications';
+
+// Reminder notifications (same defaults as the reminder worker).
+$config['reminder_address'] = getenv('ADDRESS') ?: 'Пушкина,19';
+$config['reminder_contact_phone'] = getenv('CONTACT_PHONE') ?: '+74955554433';
+$config['reminder_type'] = getenv('REMINDER_TYPE') ?: 'appointment_reminder';
+$config['reminder_subject'] = getenv('REMINDER_SUBJECT') ?: 'Напоминание о записи на СТО';
+$config['reminder_phone_prefix'] = getenv('REMINDER_PHONE_PREFIX') ?: '+7';

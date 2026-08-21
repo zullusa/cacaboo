@@ -461,6 +461,30 @@ App.Utils.CalendarTableView = (function () {
         }
     }
 
+    /**
+     * Handle popover notify button click - send a reminder right away.
+     */
+    function onNotifyPopoverClick() {
+        const data = lastFocusedEventData?.extendedProps?.data;
+
+        closePopover();
+
+        if (!data || !data.id) {
+            return;
+        }
+
+        App.Http.Calendar.notifyAppointment(data.id)
+            .done((response) => {
+                App.Layouts.Backend.displayNotification(
+                    response?.success ? lang('reminder_sent') : lang('reminder_not_available'),
+                );
+                $reloadAppointments.trigger('click');
+            })
+            .fail(() => {
+                App.Layouts.Backend.displayNotification(lang('service_communication_error'));
+            });
+    }
+
     // Calendar Event Callbacks
 
     /**
@@ -1712,6 +1736,9 @@ App.Utils.CalendarTableView = (function () {
         // Popover delete button
 
         $calendar.on('click', '.delete-popover', onDeletePopoverClick);
+
+        // Popover notify button
+        $calendar.on('click', '.notify-popover', onNotifyPopoverClick);
 
         // listDay button
         $calendar.on('click', '.fc-listDay-button', setCalendarViewSize);

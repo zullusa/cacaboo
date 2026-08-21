@@ -25,6 +25,11 @@ services:
       - GOOGLE_SYNC_FEATURE=${GOOGLE_SYNC_FEATURE}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - ADDRESS=${ADDRESS}
+      - CONTACT_PHONE=${CONTACT_PHONE}
+      - REMINDER_TYPE=${WORKER_TYPE}
+      - REMINDER_SUBJECT=${WORKER_SUBJECT}
+      - REMINDER_PHONE_PREFIX=${REMINDER_PHONE_PREFIX}
     volumes:
       - '.:/var/www/html'
       - './docker/php-fpm/php-ini-overrides.ini:/usr/local/etc/php/conf.d/99-overrides.ini'

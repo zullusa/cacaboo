@@ -268,6 +268,10 @@ App.Utils.CalendarEventPopover = (function () {
         const customer = data.customer;
         const provider = data.provider;
         const customerName = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || '-';
+        const hoursUntilStart = (new Date(info.event.start).getTime() - Date.now()) / 3600000;
+        const canNotify =
+            data.status !== 'Оповещен' && hoursUntilStart > 0 && hoursUntilStart < 24 && !!customer.phone_number;
+
         return $('<div/>', {
             html: [
                 ...createPopoverRow('start', formatDateTime(info.event.start)),
@@ -295,6 +299,17 @@ App.Utils.CalendarEventPopover = (function () {
                           $('<strong/>', {class: 'd-inline-block me-2', text: lang('phone')}),
                           renderPhoneIcon(customer.phone_number),
                           $('<span/>', {class: 'd-inline-block', text: customer.phone_number}),
+                          ...(canNotify
+                              ? [
+                                    $('<button/>', {
+                                        class: 'notify-popover btn btn-sm btn-outline-primary ms-2',
+                                        html: [
+                                            $('<i/>', {class: 'fas fa-bell me-1'}),
+                                            $('<span/>', {text: lang('notify')}),
+                                        ],
+                                    }),
+                                ]
+                              : []),
                           $('<br/>'),
                       ]
                     : []),
