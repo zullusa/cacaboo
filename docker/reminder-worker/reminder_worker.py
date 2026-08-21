@@ -217,6 +217,8 @@ class ReminderWorker:
 
                 for days in self.offsets:
                     self.process_offset(cursor, now, days)
+
+                self.process_last_day(cursor, now)
         finally:
             connection.close()
 
@@ -240,6 +242,30 @@ class ReminderWorker:
 
         logger.info("Found %s appointment(s) %s day(s) ahead", len(appointments), days)
 
+        self.notify_appointments(cursor, appointments, days)
+
+    def process_last_day(self, cursor, now: datetime) -> None:
+        """Remind booked appointments that start within the next 24 hours.
+
+        Appointments that were created (or moved) into the last day window
+        never match the exact one day ahead reminder window, so they are
+        picked up here. The messages are identical to the one day ahead
+        reminders (including the status change to "Оповещен" after a
+        successful delivery) and share the same deduplication marker.
+        """
+        window_start = now
+        window_end = now + timedelta(days=1)
+
+        appointments = self.fetch_candidates(cursor, window_start, window_end)
+
+        if not appointments:
+            return
+
+        logger.info("Found %s appointment(s) starting within the next day", len(appointments))
+
+        self.notify_appointments(cursor, appointments, 1)
+
+    def notify_appointments(self, cursor, appointments: list[dict], days: int) -> None:
         for appointment in appointments:
             appointment_id = int(appointment["id"])
             start_datetime = parse_start_datetime(appointment["start_datetime"])
