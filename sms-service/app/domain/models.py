@@ -15,6 +15,7 @@ class SmsMessage:
     phone_number: str
     text: str
     appointment_id: int | None = None
+    offset_days: int | None = None
 
     @classmethod
     def from_dict(cls, payload: dict) -> "SmsMessage":
@@ -33,6 +34,7 @@ class SmsMessage:
             phone_number=phone_number,
             text=text,
             appointment_id=cls._parse_appointment_id(payload),
+            offset_days=cls._parse_offset_days(payload),
         )
 
     @staticmethod
@@ -46,6 +48,18 @@ class SmsMessage:
             except (TypeError, ValueError):
                 return None
         return None
+
+    @staticmethod
+    def _parse_offset_days(payload: dict) -> int | None:
+        raw = payload.get("offset_days")
+
+        if raw is None or raw == "":
+            return None
+
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            return None
 
     @classmethod
     def from_json(cls, raw: bytes | str) -> "SmsMessage":

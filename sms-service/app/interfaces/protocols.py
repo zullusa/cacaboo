@@ -24,5 +24,5 @@ class NotifiedPublisher(ABC):
     """Acknowledges a successfully sent SMS back to the caller."""
 
     @abstractmethod
-    def publish(self, appointment_id: int) -> None:
+    def publish(self, appointment_id: int, offset_days: int | None = None) -> None:
         """Publish the appointment id to the notified feedback queue."""

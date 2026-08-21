@@ -36,4 +36,4 @@ class SmsDispatchService:
     def _acknowledge(self, message: SmsMessage) -> None:
         if message.appointment_id is None or self._notified_publisher is None:
             return
-        self._notified_publisher.publish(message.appointment_id)
+        self._notified_publisher.publish(message.appointment_id, message.offset_days)

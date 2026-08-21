@@ -36,7 +36,7 @@ class RabbitMqNotifiedPublisher(NotifiedPublisher):
         self._routing_key = routing_key or queue_name
         self._heartbeat = heartbeat
 
-    def publish(self, appointment_id: int) -> None:
+    def publish(self, appointment_id: int, offset_days: int | None = None) -> None:
         connection = pika.BlockingConnection(self._parameters())
         try:
             channel = connection.channel()
@@ -52,10 +52,15 @@ class RabbitMqNotifiedPublisher(NotifiedPublisher):
                     routing_key=self._routing_key,
                 )
 
+            body: dict = {"appointment_id": appointment_id}
+
+            if offset_days is not None:
+                body["offset_days"] = offset_days
+
             channel.basic_publish(
                 exchange=self._exchange,
                 routing_key=self._routing_key,
-                body=json.dumps({"appointment_id": appointment_id}, ensure_ascii=False),
+                body=json.dumps(body, ensure_ascii=False),
                 properties=pika.BasicProperties(
                     content_type="application/json",
                     delivery_mode=2,

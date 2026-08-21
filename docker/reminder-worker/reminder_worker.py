@@ -91,6 +91,16 @@ def parse_start_datetime(value) -> datetime:
     return datetime.strptime(str(value), "%Y-%m-%d %H:%M:%S")
 
 
+def _to_int(value) -> int | None:
+    if value is None or value == "":
+        return None
+
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def build_message(start_datetime: datetime) -> str:
     return (
         f"Добрый день! Напоминаем, что вы записаны на СТО по адресу "
@@ -104,6 +114,7 @@ def build_payload(
     start_datetime: datetime,
     subject: str,
     phone: str | None = None,
+    offset_days: int | None = None,
 ) -> dict:
     return {
         "type": env("REMINDER_TYPE", "appointment_reminder"),
@@ -112,6 +123,7 @@ def build_payload(
         "email": appointment["email"] or "",
         "subject": subject,
         "message": build_message(start_datetime),
+        "offset_days": offset_days,
     }
 
 
@@ -137,6 +149,7 @@ class ReminderWorker:
             status=self.notified_status,
             table_prefix=self.table_prefix,
             heartbeat=self.heartbeat,
+            status_offset=int(env("REMINDER_STATUS_OFFSET", "1")),
         )
 
     def stop(self) -> None:
@@ -251,6 +264,7 @@ class ReminderWorker:
                 start_datetime,
                 self.subject,
                 self.normalize_phone(appointment["phone"]),
+                offset_days=days,
             )
 
             try:
@@ -360,8 +374,10 @@ class NotifiedStatusUpdater:
 
     The SMS service publishes every appointment id right after it has
     successfully sent the reminder SMS. This consumer turns that signal
-    into a database status update (e.g. "Оповещен") so that the
-    appointment status stays informative.
+    into a database status update (e.g. "Оповещен") — but only for the
+    reminders that were sent for the configured offset (by default one
+    day ahead). Reminders for other offsets (e.g. 7 or 3 days ahead)
+    do not change the appointment status.
     """
 
     def __init__(
@@ -372,6 +388,7 @@ class NotifiedStatusUpdater:
         table_prefix: str,
         reconnect_delay: int = 5,
         heartbeat: int = 60,
+        status_offset: int = 1,
     ) -> None:
         self.amqp_config = amqp_config
         self.db_config = db_config
@@ -379,6 +396,7 @@ class NotifiedStatusUpdater:
         self.table_prefix = table_prefix
         self.reconnect_delay = reconnect_delay
         self.heartbeat = heartbeat
+        self.status_offset = status_offset
         self.should_stop = False
 
     def stop(self) -> None:
@@ -444,12 +462,24 @@ class NotifiedStatusUpdater:
     def _make_callback(self):
         def callback(ch, method, properties, body: bytes) -> None:
             try:
-                appointment_id = self._parse_appointment_id(body)
+                appointment_id, offset_days = self._parse_message(body)
 
                 if appointment_id is None:
                     logger.warning(
                         "Discarding notified message without appointment id: %r",
                         body,
+                    )
+                    ch.basic_ack(method.delivery_tag)
+                    return
+
+                if offset_days is not None and offset_days != self.status_offset:
+                    logger.info(
+                        "Appointment %s not marked as '%s': reminder was sent %s day(s) ahead "
+                        "(only %s day(s) ahead reminders update the status)",
+                        appointment_id,
+                        self.status,
+                        offset_days,
+                        self.status_offset,
                     )
                     ch.basic_ack(method.delivery_tag)
                     return
@@ -471,18 +501,14 @@ class NotifiedStatusUpdater:
         return callback
 
     @staticmethod
-    def _parse_appointment_id(body: bytes) -> int | None:
+    def _parse_message(body: bytes) -> tuple[int | None, int | None]:
+        """Extract the appointment id and the reminder offset from a message."""
         payload = json.loads(body)
 
         if not isinstance(payload, dict):
-            return None
+            return None, None
 
-        raw = payload.get("appointment_id")
-
-        if raw is None or raw == "":
-            return None
-
-        return int(raw)
+        return _to_int(payload.get("appointment_id")), _to_int(payload.get("offset_days"))
 
     def _mark_notified(self, appointment_id: int) -> None:
         connection = pymysql.connect(**self.db_config)
