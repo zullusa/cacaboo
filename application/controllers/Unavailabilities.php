@@ -48,6 +48,7 @@ class Unavailabilities extends EA_Controller
         $this->load->library('timezones');
         $this->load->library('webhooks_client');
         $this->load->library('audit');
+        $this->load->library('synchronization');
     }
 
     /**
@@ -69,7 +70,7 @@ class Unavailabilities extends EA_Controller
 
             $keyword = request('keyword', '');
 
-            $order_by = request('order_by', 'update_datetime DESC');
+            $order_by = request('order_by', 'appointments.update_datetime DESC');
 
             $limit = request('limit', 1000);
 

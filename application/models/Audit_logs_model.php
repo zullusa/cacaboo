@@ -104,7 +104,7 @@ class Audit_logs_model extends EA_Model
             ->from('audit_logs')
             ->limit($limit)
             ->offset($offset)
-            ->order_by($this->quote_order_by($order_by))
+            ->order_by($this->quote_order_by($order_by), '', FALSE)
             ->get()
             ->result_array();
 
@@ -136,7 +136,7 @@ class Audit_logs_model extends EA_Model
         }
 
         if ($order_by !== null) {
-            $this->db->order_by($this->quote_order_by($order_by));
+            $this->db->order_by($this->quote_order_by($order_by), '', FALSE);
         }
 
         $logs = $this->db->get('audit_logs', $limit, $offset)->result_array();

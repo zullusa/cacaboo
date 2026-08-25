@@ -1,22 +1,23 @@
 openapi: 3.0.3
 info:
-  title: Easy!Appointments API
+  title: CaCaBoo API
   version: 1.0.0
   description: These are the OpenAPI specs that describe the REST API of Appointments.
-  termsOfService: https://easyappointments.org/terms-and-conditions
+  termsOfService: https://sto-pitstop.ru
   contact:
     name: Appointments
-    url: https://easyappointments.org
-    email: info@easyappointments.org
+    url: https://sto-pitstop.ru
+    email: zilog@bk.ru
   license:
     name: GPL-3.0
     url: https://www.gnu.org/licenses/gpl-3.0.en.html
 externalDocs:
-  description: Find out more about Easy!Appointments
-  url: https://easyappointments.org/docs.html
+  description: Find out more about CaCaBoo
+  url: https://sto-pitstop.ru
 servers:
   - url: http://localhost/index.php/api/v1/
-  - url: https://demo.easyappointments.org/index.php/api/v1/
+  - url: http://localhost/index.php/
+    description: Backend endpoints (php-fpm controllers, session or Basic Auth)
 tags:
   - name: admins
   - name: appointments
@@ -31,6 +32,26 @@ tags:
   - name: unavailabilities
   - name: webhooks
   - name: working_plan_exceptions
+  - name: backend_auth
+  - name: backend_calendar
+  - name: backend_appointments
+  - name: backend_customers
+  - name: backend_providers
+  - name: backend_admins
+  - name: backend_secretaries
+  - name: backend_services
+  - name: backend_service_categories
+  - name: backend_blocked_periods
+  - name: backend_unavailabilities
+  - name: backend_webhooks
+  - name: backend_working_plan_exceptions
+  - name: backend_settings
+  - name: backend_audit
+  - name: backend_account
+  - name: backend_integrations
+  - name: integrations
+  - name: backend_booking
+  - name: backend_misc
 paths:
   /availabilities:
     get:
@@ -2137,6 +2158,2902 @@ paths:
       security:
         - BearerToken: [ ]
         - BasicAuth: [ ]
+  /login:
+    get:
+      tags:
+        - backend_auth
+      summary: Renders the login page (HTML).
+      responses:
+        '200':
+          description: Login page HTML.
+
+  /login/validate:
+    post:
+      tags:
+        - backend_auth
+      summary: Validates the credentials and starts a session.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [username, password, csrf_token]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                csrf_token:
+                  type: string
+      responses:
+        '200':
+          description: Session cookie set on success.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '401':
+          description: Invalid credentials.
+
+  /logout:
+    get:
+      tags:
+        - backend_auth
+      summary: Destroys the current session and redirects to the login page.
+      responses:
+        '302':
+          description: Redirect to the login page.
+
+  /localization/change_language:
+    post:
+      tags:
+        - backend_auth
+      summary: Changes the session language.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, language]
+              properties:
+                csrf_token:
+                  type: string
+                language:
+                  type: string
+      responses:
+        '200':
+          description: OK
+
+  /captcha/index:
+    get:
+      tags:
+        - backend_misc
+      summary: Renders a CAPTCHA image.
+      responses:
+        '200':
+          description: JPEG image.
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+
+  /captcha/altcha_challenge:
+    get:
+      tags:
+        - backend_misc
+      summary: Returns an ALTCHA challenge payload for the booking form.
+      responses:
+        '200':
+          description: Challenge payload.
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: ALTCHA is not enabled.
+
+  /calendar/get_calendar_appointments:
+    post:
+      tags:
+        - backend_calendar
+      summary: Gets the calendar events of the selected filter item between two dates.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, start_date, end_date]
+              properties:
+                csrf_token:
+                  type: string
+                record_id:
+                  type: integer
+                filter_type:
+                  type: string
+                start_date:
+                  type: string
+                  example: '2025-01-01'
+                end_date:
+                  type: string
+                  example: '2025-01-31'
+      responses:
+        '200':
+          description: Calendar events grouped by record type.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  appointments:
+                    type: array
+                    items:
+                      type: object
+                  unavailabilities:
+                    type: array
+                    items:
+                      type: object
+                  events:
+                    type: array
+                    items:
+                      type: object
+
+  /calendar/get_calendar_appointments_for_table_view:
+    post:
+      tags:
+        - backend_calendar
+      summary: Gets the table view rows (appointments of multiple providers) between two dates.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, start_date, end_date]
+              properties:
+                csrf_token:
+                  type: string
+                start_date:
+                  type: string
+                end_date:
+                  type: string
+      responses:
+        '200':
+          description: Table view rows.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /calendar/save_appointment:
+    post:
+      tags:
+        - backend_calendar
+      summary: >
+        Inserts or updates an appointment from the calendar dialog. Reuses an
+        existing customer matched by phone number or email.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, appointment_data]
+              properties:
+                csrf_token:
+                  type: string
+                appointment_data:
+                  type: object
+                  description: Sent as form-encoded nested fields (key[subkey]=value).
+                  properties:
+                    id:
+                      type: integer
+                    id_users_provider:
+                      type: integer
+                    id_users_customer:
+                      type: integer
+                    id_services:
+                      type: integer
+                    is_unavailability:
+                      type: integer
+                    start_datetime:
+                      type: string
+                    end_datetime:
+                      type: string
+                    car_make:
+                      type: string
+                    car_plate:
+                      type: string
+                    notes:
+                      type: string
+                    location:
+                      type: string
+                customer_data:
+                  type: object
+                  nullable: true
+                  description: Optional customer data, sent as form-encoded nested fields (key[subkey]=value).
+                  properties:
+                    first_name:
+                      type: string
+                    last_name:
+                      type: string
+                    email:
+                      type: string
+                    phone_number:
+                      type: string
+                    address:
+                      type: string
+                    city:
+                      type: string
+                    zip_code:
+                      type: string
+                    notes:
+                      type: string
+                notify_users:
+                  type: boolean
+                  default: true
+                force_save:
+                  type: boolean
+                  description: Save even when the provider has conflicting appointments.
+      responses:
+        '200':
+          description: Save result (may return a conflict flag).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  conflict:
+                    type: boolean
+                  message:
+                    type: string
+
+  /calendar/delete_appointment:
+    post:
+      tags:
+        - backend_calendar
+      summary: Deletes an appointment and notifies provider/customer if requested.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, appointment_id]
+              properties:
+                csrf_token:
+                  type: string
+                appointment_id:
+                  type: integer
+                cancellation_reason:
+                  type: string
+                notify_users:
+                  type: boolean
+                  default: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /calendar/notify_appointment:
+    post:
+      tags:
+        - backend_calendar
+      summary: >
+        Sends a reminder notification right away. Only available for
+        appointments that start in less than 24 hours. Publishes the same
+        payload as the one day ahead reminder of the reminder worker and marks
+        the appointment as notified after a successful delivery.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, appointment_id]
+              properties:
+                csrf_token:
+                  type: string
+                appointment_id:
+                  type: integer
+      responses:
+        '200':
+          description: Publish result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /calendar/save_unavailability:
+    post:
+      tags:
+        - backend_calendar
+      summary: Inserts or updates an unavailability period.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, unavailability]
+              properties:
+                csrf_token:
+                  type: string
+                unavailability:
+                  type: object
+                  description: Sent as form-encoded nested fields (key[subkey]=value).
+                  properties:
+                    notes:
+                      type: string
+                    is_unavailability:
+                      type: integer
+                    id_users_provider:
+                      type: integer
+                    start_datetime:
+                      type: string
+                    end_datetime:
+                      type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /calendar/delete_unavailability:
+    post:
+      tags:
+        - backend_calendar
+      summary: Deletes an unavailability period.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, unavailability_id]
+              properties:
+                csrf_token:
+                  type: string
+                unavailability_id:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+
+  /calendar/save_working_plan_exception:
+    post:
+      tags:
+        - backend_calendar
+      summary: Inserts or updates a working plan exception of a provider.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, working_plan_exception, provider_id]
+              properties:
+                csrf_token:
+                  type: string
+                working_plan_exception:
+                  type: object
+                  description: >
+                    Sent as form-encoded nested fields (key[subkey]=value).
+                    Keyed by date string, with value containing startTime, endTime,
+                    and breaks array.
+                  additionalProperties:
+                    type: object
+                    properties:
+                      startTime:
+                        type: string
+                      endTime:
+                        type: string
+                      breaks:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            start:
+                              type: string
+                            end:
+                              type: string
+                provider_id:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+
+  /calendar/delete_working_plan_exception:
+    post:
+      tags:
+        - backend_calendar
+      summary: Deletes a working plan exception of a provider.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, start_datetime, end_datetime, provider_id]
+              properties:
+                csrf_token:
+                  type: string
+                start_datetime:
+                  type: string
+                end_datetime:
+                  type: string
+                provider_id:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+
+  /appointments/search:
+    post:
+      tags:
+        - backend_appointments
+      summary: Filters appointments by keyword.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                csrf_token:
+                  type: string
+                keyword:
+                  type: string
+                limit:
+                  type: integer
+                offset:
+                  type: integer
+                order_by:
+                  type: string
+      responses:
+        '200':
+          description: Appointment records with related service, provider and customer data.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /appointments/store:
+    post:
+      tags:
+        - backend_appointments
+      summary: Creates an appointment.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, appointment]
+              properties:
+                csrf_token:
+                  type: string
+                appointment:
+                  type: object
+                  description: Sent as form-encoded nested fields (key[subkey]=value).
+                  properties:
+                    id:
+                      type: integer
+                    id_users_provider:
+                      type: integer
+                    id_users_customer:
+                      type: integer
+                    id_services:
+                      type: integer
+                    is_unavailability:
+                      type: integer
+                    start_datetime:
+                      type: string
+                    end_datetime:
+                      type: string
+                    car_make:
+                      type: string
+                    car_plate:
+                      type: string
+                    notes:
+                      type: string
+                    location:
+                      type: string
+                customer_data:
+                  type: object
+                  nullable: true
+                  description: Optional customer data, sent as form-encoded nested fields (key[subkey]=value).
+                  properties:
+                    first_name:
+                      type: string
+                    last_name:
+                      type: string
+                    email:
+                      type: string
+                    phone_number:
+                      type: string
+                    address:
+                      type: string
+                    city:
+                      type: string
+                    zip_code:
+                      type: string
+                    notes:
+                      type: string
+                notify_users:
+                  type: boolean
+      responses:
+        '200':
+          description: Created appointment ID.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  id:
+                    type: integer
+
+  /appointments/find:
+    get:
+      tags:
+        - backend_appointments
+      summary: Gets a single appointment.
+      parameters:
+        - name: appointment_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Appointment record.
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /appointments/update:
+    post:
+      tags:
+        - backend_appointments
+      summary: Updates an appointment.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, appointment]
+              properties:
+                csrf_token:
+                  type: string
+                appointment:
+                  type: object
+                  description: Sent as form-encoded nested fields (key[subkey]=value). Must contain "id".
+                  properties:
+                    id:
+                      type: integer
+                    id_users_provider:
+                      type: integer
+                    id_users_customer:
+                      type: integer
+                    id_services:
+                      type: integer
+                    is_unavailability:
+                      type: integer
+                    start_datetime:
+                      type: string
+                    end_datetime:
+                      type: string
+                    car_make:
+                      type: string
+                    car_plate:
+                      type: string
+                    notes:
+                      type: string
+                    location:
+                      type: string
+      responses:
+        '200':
+          description: Updated appointment ID.
+
+  /appointments/destroy:
+    post:
+      tags:
+        - backend_appointments
+      summary: Deletes an appointment.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, appointment_id]
+              properties:
+                csrf_token:
+                  type: string
+                appointment_id:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+
+  /customers/find:
+    get:
+      tags:
+        - backend_customers
+      summary: Gets a single customer.
+      parameters:
+        - name: customer_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Customer record.
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /customers/search:
+    post:
+      tags:
+        - backend_customers
+      summary: Filters customers by keyword (name, email, phone, etc.).
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                csrf_token:
+                  type: string
+                keyword:
+                  type: string
+                limit:
+                  type: integer
+                offset:
+                  type: integer
+                order_by:
+                  type: string
+      responses:
+        '200':
+          description: Customer records.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /customers/store:
+    post:
+      tags:
+        - backend_customers
+      summary: Creates a customer.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, customer]
+              properties:
+                csrf_token:
+                  type: string
+                customer:
+                  type: object
+                  description: Sent as form-encoded nested fields (key[subkey]=value).
+                  properties:
+                    first_name:
+                      type: string
+                    last_name:
+                      type: string
+                    email:
+                      type: string
+                    phone_number:
+                      type: string
+                    address:
+                      type: string
+                    city:
+                      type: string
+                    zip_code:
+                      type: string
+                    notes:
+                      type: string
+      responses:
+        '200':
+          description: Created customer ID.
+
+  /customers/update:
+    post:
+      tags:
+        - backend_customers
+      summary: Updates a customer.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, customer]
+              properties:
+                csrf_token:
+                  type: string
+                customer:
+                  type: object
+                  description: Sent as form-encoded nested fields (key[subkey]=value). Must contain "id".
+                  properties:
+                    id:
+                      type: integer
+                    first_name:
+                      type: string
+                    last_name:
+                      type: string
+                    email:
+                      type: string
+                    phone_number:
+                      type: string
+                    address:
+                      type: string
+                    city:
+                      type: string
+                    zip_code:
+                      type: string
+                    notes:
+                      type: string
+      responses:
+        '200':
+          description: Updated customer ID.
+
+  /customers/destroy:
+    post:
+      tags:
+        - backend_customers
+      summary: Deletes a customer.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, customer_id]
+              properties:
+                csrf_token:
+                  type: string
+                customer_id:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+
+  /providers/search:
+    post:
+      tags:
+        - backend_providers
+      summary: Filters providers by keyword.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                csrf_token:
+                  type: string
+                keyword:
+                  type: string
+                limit:
+                  type: integer
+                offset:
+                  type: integer
+      responses:
+        '200':
+          description: Provider records.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /providers/store:
+    post:
+      tags:
+        - backend_providers
+      summary: Creates a provider.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, provider]
+              properties:
+                csrf_token:
+                  type: string
+                provider:
+                  type: object
+                  description: Sent as form-encoded nested fields (key[subkey]=value).
+                  properties:
+                    first_name:
+                      type: string
+                    last_name:
+                      type: string
+                    email:
+                      type: string
+                    phone_number:
+                      type: string
+                    address:
+                      type: string
+                    city:
+                      type: string
+                    zip_code:
+                      type: string
+                    notes:
+                      type: string
+                    settings:
+                      type: object
+                      properties:
+                        username:
+                          type: string
+                        password:
+                          type: string
+                        notifications:
+                          type: boolean
+                        calendarView:
+                          type: string
+      responses:
+        '200':
+          description: Created provider ID.
+
+  /providers/find:
+    get:
+      tags:
+        - backend_providers
+      summary: Gets a single provider.
+      parameters:
+        - name: provider_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Provider record.
+
+  /providers/update:
+    post:
+      tags:
+        - backend_providers
+      summary: Updates a provider.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, provider]
+              properties:
+                csrf_token:
+                  type: string
+                provider:
+                  type: object
+                  description: Sent as form-encoded nested fields (key[subkey]=value). Must contain "id".
+                  properties:
+                    id:
+                      type: integer
+                    first_name:
+                      type: string
+                    last_name:
+                      type: string
+                    email:
+                      type: string
+                    phone_number:
+                      type: string
+                    address:
+                      type: string
+                    city:
+                      type: string
+                    zip_code:
+                      type: string
+                    notes:
+                      type: string
+                    settings:
+                      type: object
+                      properties:
+                        username:
+                          type: string
+                        password:
+                          type: string
+                        notifications:
+                          type: boolean
+                        calendarView:
+                          type: string
+      responses:
+        '200':
+          description: Updated provider ID.
+
+  /providers/destroy:
+    post:
+      tags:
+        - backend_providers
+      summary: Deletes a provider.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, provider_id]
+              properties:
+                csrf_token:
+                  type: string
+                provider_id:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+
+  /admins/search:
+    post:
+      tags:
+        - backend_admins
+      summary: Filters admins by keyword.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                csrf_token:
+                  type: string
+                keyword:
+                  type: string
+                limit:
+                  type: integer
+                offset:
+                  type: integer
+      responses:
+        '200':
+          description: Admin records.
+
+  /admins/store:
+    post:
+      tags:
+        - backend_admins
+      summary: Creates an admin.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, admin]
+              properties:
+                csrf_token:
+                  type: string
+                admin:
+                  type: object
+                  description: Sent as form-encoded nested fields (key[subkey]=value).
+                  properties:
+                    first_name:
+                      type: string
+                    last_name:
+                      type: string
+                    email:
+                      type: string
+                    username:
+                      type: string
+                    password:
+                      type: string
+      responses:
+        '200':
+          description: Created admin ID.
+
+  /admins/find:
+    get:
+      tags:
+        - backend_admins
+      summary: Gets a single admin.
+      parameters:
+        - name: admin_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Admin record.
+
+  /admins/update:
+    post:
+      tags:
+        - backend_admins
+      summary: Updates an admin.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, admin]
+              properties:
+                csrf_token:
+                  type: string
+                admin:
+                  type: object
+                  description: Sent as form-encoded nested fields (key[subkey]=value). Must contain "id".
+                  properties:
+                    id:
+                      type: integer
+                    first_name:
+                      type: string
+                    last_name:
+                      type: string
+                    email:
+                      type: string
+                    username:
+                      type: string
+                    password:
+                      type: string
+      responses:
+        '200':
+          description: Updated admin ID.
+
+  /admins/destroy:
+    post:
+      tags:
+        - backend_admins
+      summary: Deletes an admin (self-deletion is not allowed).
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, admin_id]
+              properties:
+                csrf_token:
+                  type: string
+                admin_id:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+
+  /secretaries/search:
+    post:
+      tags:
+        - backend_secretaries
+      summary: Filters secretaries by keyword.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                csrf_token:
+                  type: string
+                keyword:
+                  type: string
+                limit:
+                  type: integer
+                offset:
+                  type: integer
+      responses:
+        '200':
+          description: Secretary records.
+
+  /secretaries/store:
+    post:
+      tags:
+        - backend_secretaries
+      summary: Creates a secretary.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, secretary]
+              properties:
+                csrf_token:
+                  type: string
+                secretary:
+                  type: string
+      responses:
+        '200':
+          description: Created secretary ID.
+
+  /secretaries/find:
+    get:
+      tags:
+        - backend_secretaries
+      summary: Gets a single secretary.
+      parameters:
+        - name: secretary_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Secretary record.
+
+  /secretaries/update:
+    post:
+      tags:
+        - backend_secretaries
+      summary: Updates a secretary.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, secretary]
+              properties:
+                csrf_token:
+                  type: string
+                secretary:
+                  type: string
+      responses:
+        '200':
+          description: Updated secretary ID.
+
+  /secretaries/destroy:
+    post:
+      tags:
+        - backend_secretaries
+      summary: Deletes a secretary.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, secretary_id]
+              properties:
+                csrf_token:
+                  type: string
+                secretary_id:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+
+  /services/search:
+    post:
+      tags:
+        - backend_services
+      summary: Filters services by keyword.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                csrf_token:
+                  type: string
+                keyword:
+                  type: string
+                limit:
+                  type: integer
+                offset:
+                  type: integer
+      responses:
+        '200':
+          description: Service records.
+
+  /services/store:
+    post:
+      tags:
+        - backend_services
+      summary: Creates a service.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, service]
+              properties:
+                csrf_token:
+                  type: string
+                service:
+                  type: string
+      responses:
+        '200':
+          description: Created service ID.
+
+  /services/find:
+    get:
+      tags:
+        - backend_services
+      summary: Gets a single service.
+      parameters:
+        - name: service_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Service record.
+
+  /services/update:
+    post:
+      tags:
+        - backend_services
+      summary: Updates a service.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, service]
+              properties:
+                csrf_token:
+                  type: string
+                service:
+                  type: string
+      responses:
+        '200':
+          description: Updated service ID.
+
+  /services/destroy:
+    post:
+      tags:
+        - backend_services
+      summary: Deletes a service.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, service_id]
+              properties:
+                csrf_token:
+                  type: string
+                service_id:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+
+  /service_categories/search:
+    post:
+      tags:
+        - backend_service_categories
+      summary: Filters service categories by keyword.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                csrf_token:
+                  type: string
+                keyword:
+                  type: string
+                limit:
+                  type: integer
+                offset:
+                  type: integer
+      responses:
+        '200':
+          description: Service category records.
+
+  /service_categories/store:
+    post:
+      tags:
+        - backend_service_categories
+      summary: Creates a service category.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, service_category]
+              properties:
+                csrf_token:
+                  type: string
+                service_category:
+                  type: string
+      responses:
+        '200':
+          description: Created service category ID.
+
+  /service_categories/find:
+    get:
+      tags:
+        - backend_service_categories
+      summary: Gets a single service category.
+      parameters:
+        - name: service_category_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Service category record.
+
+  /service_categories/update:
+    post:
+      tags:
+        - backend_service_categories
+      summary: Updates a service category.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, service_category]
+              properties:
+                csrf_token:
+                  type: string
+                service_category:
+                  type: string
+      responses:
+        '200':
+          description: Updated service category ID.
+
+  /service_categories/destroy:
+    post:
+      tags:
+        - backend_service_categories
+      summary: Deletes a service category.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, service_category_id]
+              properties:
+                csrf_token:
+                  type: string
+                service_category_id:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+
+  /blocked_periods/search:
+    post:
+      tags:
+        - backend_blocked_periods
+      summary: Filters blocked periods by keyword.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                csrf_token:
+                  type: string
+                keyword:
+                  type: string
+                limit:
+                  type: integer
+                offset:
+                  type: integer
+      responses:
+        '200':
+          description: Blocked period records.
+
+  /blocked_periods/store:
+    post:
+      tags:
+        - backend_blocked_periods
+      summary: Creates a blocked period.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, blocked_period]
+              properties:
+                csrf_token:
+                  type: string
+                blocked_period:
+                  type: string
+      responses:
+        '200':
+          description: Created blocked period ID.
+
+  /blocked_periods/find:
+    get:
+      tags:
+        - backend_blocked_periods
+      summary: Gets a single blocked period.
+      parameters:
+        - name: blocked_period_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Blocked period record.
+
+  /blocked_periods/update:
+    post:
+      tags:
+        - backend_blocked_periods
+      summary: Updates a blocked period.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, blocked_period]
+              properties:
+                csrf_token:
+                  type: string
+                blocked_period:
+                  type: string
+      responses:
+        '200':
+          description: Updated blocked period ID.
+
+  /blocked_periods/destroy:
+    post:
+      tags:
+        - backend_blocked_periods
+      summary: Deletes a blocked period.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, blocked_period_id]
+              properties:
+                csrf_token:
+                  type: string
+                blocked_period_id:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+
+  /unavailabilities/search:
+    post:
+      tags:
+        - backend_unavailabilities
+      summary: Filters unavailabilities by keyword.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                csrf_token:
+                  type: string
+                keyword:
+                  type: string
+                limit:
+                  type: integer
+                offset:
+                  type: integer
+      responses:
+        '200':
+          description: Unavailability records.
+
+  /unavailabilities/store:
+    post:
+      tags:
+        - backend_unavailabilities
+      summary: Creates an unavailability.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, unavailability]
+              properties:
+                csrf_token:
+                  type: string
+                unavailability:
+                  type: string
+      responses:
+        '200':
+          description: Created unavailability ID.
+
+  /unavailabilities/find:
+    get:
+      tags:
+        - backend_unavailabilities
+      summary: Gets a single unavailability.
+      parameters:
+        - name: unavailability_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Unavailability record.
+
+  /unavailabilities/update:
+    post:
+      tags:
+        - backend_unavailabilities
+      summary: Updates an unavailability.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, unavailability]
+              properties:
+                csrf_token:
+                  type: string
+                unavailability:
+                  type: string
+      responses:
+        '200':
+          description: Updated unavailability ID.
+
+  /unavailabilities/destroy:
+    post:
+      tags:
+        - backend_unavailabilities
+      summary: Deletes an unavailability.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, unavailability_id]
+              properties:
+                csrf_token:
+                  type: string
+                unavailability_id:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+
+  /webhooks/search:
+    post:
+      tags:
+        - backend_webhooks
+      summary: Filters webhooks by keyword.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                csrf_token:
+                  type: string
+                keyword:
+                  type: string
+                limit:
+                  type: integer
+                offset:
+                  type: integer
+      responses:
+        '200':
+          description: Webhook records.
+
+  /webhooks/store:
+    post:
+      tags:
+        - backend_webhooks
+      summary: Creates a webhook.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, webhook]
+              properties:
+                csrf_token:
+                  type: string
+                webhook:
+                  type: string
+      responses:
+        '200':
+          description: Created webhook ID.
+
+  /webhooks/find:
+    get:
+      tags:
+        - backend_webhooks
+      summary: Gets a single webhook.
+      parameters:
+        - name: webhook_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Webhook record.
+
+  /webhooks/update:
+    post:
+      tags:
+        - backend_webhooks
+      summary: Updates a webhook.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, webhook]
+              properties:
+                csrf_token:
+                  type: string
+                webhook:
+                  type: string
+      responses:
+        '200':
+          description: Updated webhook ID.
+
+  /webhooks/destroy:
+    post:
+      tags:
+        - backend_webhooks
+      summary: Deletes a webhook.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, webhook_id]
+              properties:
+                csrf_token:
+                  type: string
+                webhook_id:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+
+  /working_plan_exceptions/search:
+    post:
+      tags:
+        - backend_working_plan_exceptions
+      summary: Filters working plan exceptions by keyword.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                csrf_token:
+                  type: string
+                keyword:
+                  type: string
+                limit:
+                  type: integer
+                offset:
+                  type: integer
+      responses:
+        '200':
+          description: Working plan exception records.
+
+  /working_plan_exceptions/store:
+    post:
+      tags:
+        - backend_working_plan_exceptions
+      summary: Creates a working plan exception.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, working_plan_exception]
+              properties:
+                csrf_token:
+                  type: string
+                working_plan_exception:
+                  type: string
+      responses:
+        '200':
+          description: Created working plan exception ID.
+
+  /working_plan_exceptions/find:
+    get:
+      tags:
+        - backend_working_plan_exceptions
+      summary: Gets a single working plan exception.
+      parameters:
+        - name: working_plan_exception_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Working plan exception record.
+
+  /working_plan_exceptions/update:
+    post:
+      tags:
+        - backend_working_plan_exceptions
+      summary: Updates a working plan exception.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, working_plan_exception]
+              properties:
+                csrf_token:
+                  type: string
+                working_plan_exception:
+                  type: string
+      responses:
+        '200':
+          description: Updated working plan exception ID.
+
+  /working_plan_exceptions/destroy:
+    post:
+      tags:
+        - backend_working_plan_exceptions
+      summary: Deletes a working plan exception.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, working_plan_exception_id]
+              properties:
+                csrf_token:
+                  type: string
+                working_plan_exception_id:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+
+  /working_plan_exceptions/get_by_provider:
+    get:
+      tags:
+        - backend_working_plan_exceptions
+      summary: Gets all working plan exceptions of a provider.
+      parameters:
+        - name: provider_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Working plan exceptions of the provider.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /audit/search:
+    post:
+      tags:
+        - backend_audit
+      summary: Filters the user action audit log by keyword.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                csrf_token:
+                  type: string
+                keyword:
+                  type: string
+                limit:
+                  type: integer
+                  default: 50
+                offset:
+                  type: integer
+      responses:
+        '200':
+          description: Audit log entries with a changes map ({added, changed, deleted}).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    user_id:
+                      type: integer
+                      nullable: true
+                    user_name:
+                      type: string
+                    action:
+                      type: string
+                      enum: [created, updated, deleted]
+                    entity_type:
+                      type: string
+                      enum: [appointment, unavailability, customer, provider, admin, secretary, service, service_category, blocked_period, setting]
+                    entity_id:
+                      type: integer
+                      nullable: true
+                    entity_name:
+                      type: string
+                    changes:
+                      type: object
+                      properties:
+                        added:
+                          type: object
+                        changed:
+                          type: object
+                        deleted:
+                          type: object
+                    create_datetime:
+                      type: string
+
+  /general_settings/save:
+    post:
+      tags:
+        - backend_settings
+      summary: Saves the general settings (whitelisted names only).
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token]
+              properties:
+                csrf_token:
+                  type: string
+                general_settings:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      value:
+                        type: string
+                  description: Array of {name, value} pairs, sent as form-encoded nested fields.
+      responses:
+        '200':
+          description: OK
+
+  /booking_settings/save:
+    post:
+      tags:
+        - backend_settings
+      summary: Saves the booking settings.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token]
+              properties:
+                csrf_token:
+                  type: string
+                booking_settings:
+                  type: string
+      responses:
+        '200':
+          description: OK
+
+  /business_settings/save:
+    post:
+      tags:
+        - backend_settings
+      summary: Saves the business logic settings.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token]
+              properties:
+                csrf_token:
+                  type: string
+                business_settings:
+                  type: string
+      responses:
+        '200':
+          description: OK
+
+  /business_settings/apply_global_working_plan:
+    post:
+      tags:
+        - backend_settings
+      summary: Applies the company working plan to every provider.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token]
+              properties:
+                csrf_token:
+                  type: string
+                working_plan:
+                  type: string
+      responses:
+        '200':
+          description: OK
+
+  /legal_settings/save:
+    post:
+      tags:
+        - backend_settings
+      summary: Saves the legal contents settings.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token]
+              properties:
+                csrf_token:
+                  type: string
+                legal_settings:
+                  type: string
+      responses:
+        '200':
+          description: OK
+
+  /api_settings/save:
+    post:
+      tags:
+        - backend_settings
+      summary: Saves the API settings.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token]
+              properties:
+                csrf_token:
+                  type: string
+                api_settings:
+                  type: string
+      responses:
+        '200':
+          description: OK
+
+  /ldap_settings/save:
+    post:
+      tags:
+        - backend_settings
+      summary: Saves the LDAP settings.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token]
+              properties:
+                csrf_token:
+                  type: string
+                ldap_settings:
+                  type: string
+      responses:
+        '200':
+          description: OK
+
+  /ldap_settings/search:
+    post:
+      tags:
+        - backend_settings
+      summary: Searches LDAP entries with the configured connection.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token]
+              properties:
+                csrf_token:
+                  type: string
+                ldap_search_term:
+                  type: string
+      responses:
+        '200':
+          description: LDAP entries.
+
+  /google_analytics_settings/save:
+    post:
+      tags:
+        - backend_settings
+      summary: Saves the Google Analytics settings.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token]
+              properties:
+                csrf_token:
+                  type: string
+                google_analytics_settings:
+                  type: string
+      responses:
+        '200':
+          description: OK
+
+  /matomo_analytics_settings/save:
+    post:
+      tags:
+        - backend_settings
+      summary: Saves the Matomo Analytics settings.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token]
+              properties:
+                csrf_token:
+                  type: string
+                matomo_analytics_settings:
+                  type: string
+      responses:
+        '200':
+          description: OK
+
+  /jitsi_settings/save:
+    post:
+      tags:
+        - backend_settings
+      summary: Saves the Jitsi integration settings.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token]
+              properties:
+                csrf_token:
+                  type: string
+                jitsi_settings:
+                  type: string
+      responses:
+        '200':
+          description: OK
+
+  /altcha_settings/save:
+    post:
+      tags:
+        - backend_settings
+      summary: Saves the ALTCHA anti-spam settings.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token]
+              properties:
+                csrf_token:
+                  type: string
+                altcha_settings:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      value:
+                        type: string
+                  description: Array of {name, value} pairs, sent as form-encoded nested fields.
+      responses:
+        '200':
+          description: OK
+
+  /altcha_settings/generate_key:
+    get:
+      tags:
+        - backend_settings
+      summary: Generates a new ALTCHA HMAC key (not saved automatically).
+      responses:
+        '200':
+          description: Generated key.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hmac_key:
+                    type: string
+
+  /account/save:
+    post:
+      tags:
+        - backend_account
+      summary: Saves the current user account settings.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token]
+              properties:
+                csrf_token:
+                  type: string
+                account:
+                  type: string
+      responses:
+        '200':
+          description: OK
+
+  /account/validate_username:
+    post:
+      tags:
+        - backend_account
+      summary: Checks whether a username is still available.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token]
+              properties:
+                csrf_token:
+                  type: string
+                username:
+                  type: string
+                user_id:
+                  type: integer
+      responses:
+        '200':
+          description: Availability result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  is_valid:
+                    type: boolean
+
+  /user/forgot_password:
+    get:
+      tags:
+        - backend_auth
+      summary: Sends a password reset link to the provided email.
+      parameters:
+        - name: email
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Email sent confirmation.
+
+  /recovery/perform:
+    post:
+      tags:
+        - backend_account
+      summary: Validates the recovery token and returns the reset form state.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: Recovery state.
+
+  /recovery/reset:
+    post:
+      tags:
+        - backend_account
+      summary: Resets the password with a valid recovery token.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Password reset result.
+
+  /privacy/delete_personal_information:
+    post:
+      tags:
+        - backend_account
+      summary: Deletes the personal information of a client identified by the provided data.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, customer_data]
+              properties:
+                csrf_token:
+                  type: string
+                customer_data:
+                  type: string
+      responses:
+        '200':
+          description: Deletion result.
+
+  /consents/save:
+    post:
+      tags:
+        - backend_booking
+      summary: Stores the terms/privacy consents of a booking customer.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                customer_data:
+                  type: string
+      responses:
+        '200':
+          description: OK
+
+  /booking/register:
+    post:
+      tags:
+        - backend_booking
+      summary: Registers a new appointment from the public booking page.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [post_data]
+              properties:
+                post_data:
+                  type: object
+                  description: Sent as form-encoded nested fields (key[subkey]=value).
+                  properties:
+                    csrf_token:
+                      type: string
+                    company_name:
+                      type: string
+                    appointment:
+                      type: object
+                      properties:
+                        service_id:
+                          type: integer
+                        provider_id:
+                          type: integer
+                        date:
+                          type: string
+                        start_datetime:
+                          type: string
+                        end_datetime:
+                          type: string
+                        notes:
+                          type: string
+                    customer:
+                      type: object
+                      properties:
+                        first_name:
+                          type: string
+                        last_name:
+                          type: string
+                        email:
+                          type: string
+                        phone_number:
+                          type: string
+                        address:
+                          type: string
+                        city:
+                          type: string
+                        zip_code:
+                          type: string
+                        notes:
+                          type: string
+                    captcha:
+                      type: string
+                    intelligent_1f418:
+                      type: string
+                    tos:
+                      type: boolean
+                csrf_token:
+                  type: string
+                captcha:
+                  type: string
+                altcha_payload:
+                  type: string
+                manage_mode:
+                  type: boolean
+      responses:
+        '200':
+          description: Registration result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  appointment_id:
+                    type: integer
+
+  /booking/get_available_hours:
+    post:
+      tags:
+        - backend_booking
+      summary: Gets the available hours of a service/provider on a date.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [provider_id, service_id, selected_date]
+              properties:
+                provider_id:
+                  type: integer
+                service_id:
+                  type: integer
+                selected_date:
+                  type: string
+                manage_mode:
+                  type: boolean
+                appointment_id:
+                  type: integer
+      responses:
+        '200':
+          description: Available hours.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+  /booking/get_unavailable_dates:
+    get:
+      tags:
+        - backend_booking
+      summary: Gets the dates without any availability for a service/provider.
+      parameters:
+        - name: service_id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: provider_id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: selected_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+            example: '2026-08-01'
+      responses:
+        '200':
+          description: Unavailable dates.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+  /google/oauth_callback:
+    get:
+      tags:
+        - backend_integrations
+      summary: Google OAuth callback endpoint.
+      parameters:
+        - name: code
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OAuth result page (HTML).
+
+  /google/get_google_calendars:
+    post:
+      tags:
+        - backend_integrations
+      summary: Lists the Google calendars of a provider access token.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token]
+              properties:
+                csrf_token:
+                  type: string
+                provider_id:
+                  type: integer
+      responses:
+        '200':
+          description: Google calendars.
+
+  /google/select_google_calendar:
+    post:
+      tags:
+        - backend_integrations
+      summary: Connects a provider to the selected Google calendar.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, provider_id, google_calendar]
+              properties:
+                csrf_token:
+                  type: string
+                provider_id:
+                  type: integer
+                google_calendar:
+                  type: string
+      responses:
+        '200':
+          description: OK
+
+  /google/disable_provider_sync:
+    post:
+      tags:
+        - backend_integrations
+      summary: Disables the Google Calendar sync of a provider.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, provider_id]
+              properties:
+                csrf_token:
+                  type: string
+                provider_id:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+
+  /google/sync:
+    post:
+      tags:
+        - integrations
+      summary: Triggers Google Calendar sync for a provider (or all providers).
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token]
+              properties:
+                csrf_token:
+                  type: string
+                provider_id:
+                  type: integer
+      responses:
+        '200':
+          description: Sync status.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /caldav/connect_to_server:
+    post:
+      tags:
+        - backend_integrations
+      summary: Connects a provider to a CalDAV server.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, provider_id, url, username, password]
+              properties:
+                csrf_token:
+                  type: string
+                provider_id:
+                  type: integer
+                url:
+                  type: string
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Connection result.
+
+  /caldav/disable_provider_sync:
+    post:
+      tags:
+        - backend_integrations
+      summary: Disables the CalDAV sync of a provider.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token, provider_id]
+              properties:
+                csrf_token:
+                  type: string
+                provider_id:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+
+  /calendar:
+    get:
+      tags:
+        - backend_calendar
+      summary: Renders the backend calendar page (HTML).
+      responses:
+        '200':
+          description: Calendar page HTML.
+
+  /calendar/reschedule/{appointmentHash}:
+    get:
+      tags:
+        - backend_calendar
+      summary: Renders the public reschedule page of an appointment (HTML).
+      parameters:
+        - name: appointmentHash
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Reschedule page HTML.
+        '302':
+          description: Redirect when the hash is unknown.
+
+  /audit:
+    get:
+      tags:
+        - backend_audit
+      summary: Renders the user action audit log page (HTML).
+      responses:
+        '200':
+          description: Page HTML.
+
+  /account:
+    get:
+      tags:
+        - backend_account
+      summary: Renders the current user account page (HTML).
+      responses:
+        '200':
+          description: Page HTML.
+
+  /general_settings:
+    get:
+      tags:
+        - backend_settings
+      summary: Renders the general settings page (HTML).
+      responses:
+        '200':
+          description: Page HTML.
+
+  /booking_settings:
+    get:
+      tags:
+        - backend_settings
+      summary: Renders the booking settings page (HTML).
+      responses:
+        '200':
+          description: Page HTML.
+
+  /business_settings:
+    get:
+      tags:
+        - backend_settings
+      summary: Renders the business logic settings page (HTML).
+      responses:
+        '200':
+          description: Page HTML.
+
+  /legal_settings:
+    get:
+      tags:
+        - backend_settings
+      summary: Renders the legal contents settings page (HTML).
+      responses:
+        '200':
+          description: Page HTML.
+
+  /api_settings:
+    get:
+      tags:
+        - backend_settings
+      summary: Renders the API settings page (HTML).
+      responses:
+        '200':
+          description: Page HTML.
+
+  /ldap_settings:
+    get:
+      tags:
+        - backend_settings
+      summary: Renders the LDAP settings page (HTML).
+      responses:
+        '200':
+          description: Page HTML.
+
+  /google_analytics_settings:
+    get:
+      tags:
+        - backend_settings
+      summary: Renders the Google Analytics settings page (HTML).
+      responses:
+        '200':
+          description: Page HTML.
+
+  /matomo_analytics_settings:
+    get:
+      tags:
+        - backend_settings
+      summary: Renders the Matomo Analytics settings page (HTML).
+      responses:
+        '200':
+          description: Page HTML.
+
+  /jitsi_settings:
+    get:
+      tags:
+        - backend_settings
+      summary: Renders the Jitsi integration settings page (HTML).
+      responses:
+        '200':
+          description: Page HTML.
+
+  /altcha_settings:
+    get:
+      tags:
+        - backend_settings
+      summary: Renders the ALTCHA anti-spam settings page (HTML).
+      responses:
+        '200':
+          description: Page HTML.
+
+  /google_calendar_settings:
+    get:
+      tags:
+        - backend_settings
+      summary: Renders the Google Calendar sync settings page (HTML).
+      responses:
+        '200':
+          description: Page HTML.
+
+  /google_calendar_settings/save:
+    post:
+      tags:
+        - backend_settings
+      summary: Saves the Google Calendar sync settings.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token]
+              properties:
+                csrf_token:
+                  type: string
+                google_calendar_settings:
+                  type: string
+      responses:
+        '200':
+          description: OK
+
+  /booking:
+    get:
+      tags:
+        - backend_booking
+      summary: Renders the public booking page (HTML).
+      responses:
+        '200':
+          description: Booking page HTML.
+
+  /booking/reschedule/{appointmentHash}:
+    get:
+      tags:
+        - backend_booking
+      summary: Renders the public appointment reschedule page (HTML).
+      parameters:
+        - name: appointmentHash
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Reschedule page HTML.
+
+  /booking_confirmation/of/{appointmentHash}:
+    get:
+      tags:
+        - backend_booking
+      summary: Renders the public appointment confirmation page (HTML).
+      parameters:
+        - name: appointmentHash
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Confirmation page HTML.
+        '302':
+          description: Redirect when the hash is unknown.
+
+  /booking_cancellation/of/{appointmentHash}:
+    get:
+      tags:
+        - backend_booking
+      summary: Renders the public appointment cancellation page (HTML).
+      parameters:
+        - name: appointmentHash
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cancellation page HTML.
+
+  /user:
+    get:
+      tags:
+        - backend_auth
+      summary: Legacy user entry point, redirects to the login page.
+      responses:
+        '302':
+          description: Redirect.
+
+  /user/login:
+    get:
+      tags:
+        - backend_auth
+      summary: Legacy login redirect.
+      responses:
+        '302':
+          description: Redirect.
+
+  /user/logout:
+    get:
+      tags:
+        - backend_auth
+      summary: Destroys the session and redirects to the login page.
+      responses:
+        '302':
+          description: Redirect.
+
+  /about:
+    get:
+      tags:
+        - backend_misc
+      summary: Renders the about page (HTML).
+      responses:
+        '200':
+          description: Page HTML.
+
+
+  /update:
+    get:
+      tags:
+        - backend_misc
+      summary: Renders the update page (HTML).
+      responses:
+        '200':
+          description: Page HTML.
+
+  /installation:
+    get:
+      tags:
+        - backend_misc
+      summary: Renders the installation wizard (redirects to the home page when already installed).
+      responses:
+        '200':
+          description: Installation wizard HTML.
+        '302':
+          description: Redirect when the app is already installed.
+
+  /installation/perform:
+    post:
+      tags:
+        - backend_misc
+      summary: Performs the installation (no-op while the app is already installed).
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                admin:
+                  type: object
+                  description: Sent as form-encoded nested fields (key[subkey]=value).
+                  properties:
+                    first_name:
+                      type: string
+                    last_name:
+                      type: string
+                    email:
+                      type: string
+                    username:
+                      type: string
+                    password:
+                      type: string
+                company:
+                  type: object
+                  description: Sent as form-encoded nested fields (key[subkey]=value).
+                  properties:
+                    company_name:
+                      type: string
+                    company_email:
+                      type: string
+                    company_phone:
+                      type: string
+                    company_address:
+                      type: string
+                    company_city:
+                      type: string
+                    company_zip_code:
+                      type: string
+                    company_country:
+                      type: string
+      responses:
+        '200':
+          description: Empty body while installed; installation result JSON otherwise.
+
+  /console/cleanup:
+    post:
+      tags:
+        - backend_misc
+      summary: Runs the system cleanup routine.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [csrf_token]
+              properties:
+                csrf_token:
+                  type: string
+      responses:
+        '200':
+          description: Cleanup status.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
 components:
   schemas:
     Availabilities:

@@ -184,7 +184,7 @@ class Appointments_model extends EA_Model
         }
 
         if ($order_by) {
-            $this->db->order_by($this->quote_order_by($order_by));
+            $this->db->order_by($this->quote_order_by($order_by), '', FALSE);
         }
 
         $appointments = $this->db
@@ -509,7 +509,7 @@ class Appointments_model extends EA_Model
             ->group_end()
             ->limit($limit)
             ->offset($offset)
-            ->order_by($this->quote_order_by($order_by))
+            ->order_by($this->quote_order_by($order_by), '', FALSE)
             ->get()
             ->result_array();
 

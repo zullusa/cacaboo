@@ -271,7 +271,7 @@ class Working_plan_exceptions_model extends EA_Model
             ->group_end()
             ->limit($limit)
             ->offset($offset)
-            ->order_by($this->quote_order_by($order_by))
+            ->order_by($this->quote_order_by($order_by), '', FALSE)
             ->get()
             ->result_array();
 
@@ -303,7 +303,7 @@ class Working_plan_exceptions_model extends EA_Model
         }
 
         if ($order_by !== null) {
-            $this->db->order_by($this->quote_order_by($order_by));
+            $this->db->order_by($this->quote_order_by($order_by), '', FALSE);
         }
 
         $working_plan_exceptions = $this->db->get('working_plan_exceptions', $limit, $offset)->result_array();

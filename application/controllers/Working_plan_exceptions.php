@@ -70,7 +70,7 @@ class Working_plan_exceptions extends EA_Controller
 
             $keyword = request('keyword', '');
 
-            $order_by = request('order_by', 'date ASC');
+            $order_by = request('order_by', 'start_date ASC');
 
             $limit = request('limit', 1000);
 
