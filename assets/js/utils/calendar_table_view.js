@@ -158,13 +158,22 @@ App.Utils.CalendarTableView = (function () {
 
         const notesHtml = eventData.notes ? '<br>' + App.Utils.String.escapeHtml(eventData.notes) : '';
 
+        const carInfo = [eventData.car_make, eventData.car_plate].filter(Boolean).join(' ');
+        const carHtml = carInfo ? '<br>' + App.Utils.String.escapeHtml(carInfo) : '';
+
+        const titleParts = App.Utils.String.escapeHtml(info.event.title).split('\n');
+        const customerHtml = titleParts[0] || '';
+        const serviceHtml = titleParts[1] ? '<br>' + titleParts[1] : '';
+
         return {
             html:
                 '<div class="fc-event-main-frame">' +
                 timeHtml +
                 '<div class="fc-event-title-container">' +
                 '<div class="fc-event-title fc-sticky">' +
-                App.Utils.String.escapeHtml(info.event.title) +
+                customerHtml +
+                carHtml +
+                serviceHtml +
                 '<br>Статус: ' +
                 getStatusEmoji(eventData.status) +
                 notesHtml +
