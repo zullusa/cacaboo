@@ -183,7 +183,7 @@ App.Utils.CalendarDefaultView = (function () {
         const notesHtml = eventData.notes ? '<br>' + App.Utils.String.escapeHtml(eventData.notes) : '';
 
         const carInfo = [eventData.car_make, eventData.car_plate].filter(Boolean).join(' ');
-        const carHtml = carInfo ? '<br>' + App.Utils.String.escapeHtml(carInfo) : '';
+        const carHtml = carInfo ? '<br><i>' + App.Utils.String.escapeHtml(carInfo) + '</i>' : '';
 
         const titleParts = App.Utils.String.escapeHtml(info.event.title).split('\n');
         const customerHtml = titleParts[0] || '';
