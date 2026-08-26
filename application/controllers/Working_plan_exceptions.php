@@ -31,9 +31,9 @@ class Working_plan_exceptions extends EA_Controller
     ];
 
     public array $optional_working_plan_exception_fields = [
-        'start_time',
-        'end_time',
-        'breaks',
+        'start_time' => null,
+        'end_time' => null,
+        'breaks' => '[]',
     ];
 
     /**

@@ -245,6 +245,17 @@ class Appointments_model extends EA_Model
     }
 
     /**
+     * Remove all reminder log entries for the given appointment so a
+     * fresh notification can be sent.
+     */
+    public function clear_reminder_log(int $appointment_id): void
+    {
+        $this->db->delete($this->db->dbprefix('reminder_log'), [
+            'appointment_id' => $appointment_id,
+        ]);
+    }
+
+    /**
      * Get the display name of the currently logged in system user.
      *
      * @return string Returns the full name of the user or an empty string if there is no authenticated user.

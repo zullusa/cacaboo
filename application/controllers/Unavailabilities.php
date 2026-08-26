@@ -70,7 +70,7 @@ class Unavailabilities extends EA_Controller
 
             $keyword = request('keyword', '');
 
-            $order_by = request('order_by', 'appointments.update_datetime DESC');
+            $order_by = request('order_by', 'update_datetime DESC');
 
             $limit = request('limit', 1000);
 

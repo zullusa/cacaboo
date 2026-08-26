@@ -295,6 +295,8 @@ class Calendar extends EA_Controller
             $this->check_event_permissions((int) $appointment_data['id_users_provider']);
 
             // Save customer changes to the database.
+            $old_customer_phone = null;
+
             if ($customer_data) {
                 $customer = $customer_data;
 
@@ -304,6 +306,16 @@ class Calendar extends EA_Controller
 
                 if (!$required_permissions) {
                     throw new RuntimeException('You do not have the required permissions for this task.');
+                }
+
+                // Capture old phone number before save to detect changes later.
+                if (!empty($customer['id'])) {
+                    try {
+                        $old_customer = $this->customers_model->find($customer['id']);
+                        $old_customer_phone = preg_replace('/\D+/', '', (string) ($old_customer['phone_number'] ?? ''));
+                    } catch (Throwable) {
+                        // Customer not found — proceed without old phone comparison.
+                    }
                 }
 
                 // The business always operates in the Moscow timezone (UTC+3).
@@ -394,6 +406,33 @@ class Calendar extends EA_Controller
                 $this->appointments_model->optional($appointment, $this->optional_appointment_fields);
 
                 $appointment['id'] = $this->appointments_model->save($appointment);
+                $booked_status = json_decode(setting('appointment_status_options', '[]'), true)[0];
+
+                // If the customer phone number changed, reset the appointment status
+                // back to the default booked value so a new notification is sent.
+                if ($old_customer_phone !== null && !empty($appointment['id'])) {
+                    $new_customer_phone = preg_replace('/\D+/', '', (string) ($customer['phone_number'] ?? ''));
+
+                    if ($old_customer_phone !== '' && $new_customer_phone !== '' && $old_customer_phone !== $new_customer_phone) {
+                        if ($booked_status !== '') {
+                            $this->db->update(
+                                $this->db->dbprefix('appointments'),
+                                ['status' => $booked_status],
+                                ['id' => $appointment['id']],
+                            );
+
+                            $this->appointments_model->clear_reminder_log((int) $appointment['id']);
+                        }
+                    }
+                }
+
+                // If the status was changed to the booked value, clear the reminder
+                // log so the notification system will send a fresh reminder.
+                if (!empty($appointment['status']) && !empty($appointment['id'])) {
+                    if ($appointment['status'] === $booked_status) {
+                        $this->appointments_model->clear_reminder_log((int) $appointment['id']);
+                    }
+                }
             }
 
             if (empty($appointment['id'])) {
