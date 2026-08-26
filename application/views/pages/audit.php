@@ -26,7 +26,7 @@
                         <?= lang('audit') ?>
                     </h4>
 
-                    <div class="results overflow-auto" style="max-height: 650px;">
+                    <div class="results overflow-auto" id="audit-results">
                         <!-- JS -->
                     </div>
 
@@ -45,5 +45,17 @@
 
 <script src="<?= asset_url('assets/js/http/audit_http_client.js') ?>"></script>
 <script src="<?= asset_url('assets/js/pages/audit.js') ?>"></script>
+<script>
+    (function () {
+        const $results = $('#audit-results');
+        function resize() {
+            const top = $results[0].getBoundingClientRect().top;
+            const gap = 16;
+            $results.css('max-height', Math.max(200, window.innerHeight - top - gap) + 'px');
+        }
+        resize();
+        $(window).on('resize', resize);
+    })();
+</script>
 
 <?php end_section('scripts'); ?>
