@@ -534,7 +534,22 @@ class Calendar extends EA_Controller
 
             $customer = $this->customers_model->find($appointment['id_users_customer']);
 
-            $phone = trim((string) ($customer['phone_number'] ?: $customer['mobile_number'] ?? ''));
+            $raw_phone = trim((string) ($customer['phone_number'] ?: $customer['mobile_number'] ?? ''));
+
+            if ($raw_phone !== '' && str_starts_with($raw_phone, '8')) {
+                $this->db->update(
+                    $this->db->dbprefix('appointments'),
+                    ['status' => 'Ошибка'],
+                    ['id' => $appointment_id],
+                );
+
+                $this->mark_reminder_sent($appointment_id);
+
+                json_response(['success' => false, 'message' => lang('phone_starts_with_8')]);
+                return;
+            }
+
+            $phone = $raw_phone;
 
             if ($phone !== '' && !str_starts_with($phone, '+')) {
                 $phone = config('reminder_phone_prefix') . $phone;

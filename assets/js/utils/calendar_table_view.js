@@ -125,6 +125,7 @@ App.Utils.CalendarTableView = (function () {
             {pattern: /запис|booked|reserved|scheduled|бронир/i, emoji: '📅'},
             {pattern: /оповещ|notified|remind/i, emoji: '🔔'},
             {pattern: /отмен|cancel/i, emoji: '❌'},
+            {pattern: /ошиб|error/i, emoji: '⛔'},
             {pattern: /ожид|pending|waiting|await/i, emoji: '⏳'},
             {pattern: /не ?яв|no-?show/i, emoji: '🚫'},
             {pattern: /выполнен|заверш|готов|finished|completed|fulfill|done/i, emoji: '🏁'},

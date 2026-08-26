@@ -139,6 +139,7 @@ class ReminderWorker:
         self.table_prefix = env("DB_PREFIX", "ea_")
         self.notified_status = env("REMINDER_STATUS_NOTIFIED", "Оповещен")
         self.booked_status = env("REMINDER_STATUS_BOOKED", "Записано")
+        self.error_status = env("REMINDER_STATUS_ERROR", "Ошибка")
         self.phone_prefix = env("REMINDER_PHONE_PREFIX", "+7")
         self.should_stop = False
         self.schema_missing_logged = False
@@ -285,6 +286,18 @@ class ReminderWorker:
                 )
                 continue
 
+            raw_phone = (appointment["phone"] or "").strip()
+
+            if raw_phone.startswith("8"):
+                logger.warning(
+                    "Skipping SMS for appointment %s: phone number starts with '8' ('%s')",
+                    appointment_id,
+                    raw_phone,
+                )
+                self.mark_error(cursor, appointment_id)
+                self.mark_sent(cursor, appointment_id, days)
+                continue
+
             payload = build_payload(
                 appointment,
                 start_datetime,
@@ -357,6 +370,12 @@ class ReminderWorker:
         cursor.execute(
             f"INSERT INTO {self.table_prefix}reminder_log (appointment_id, offset_days, sent_at) VALUES (%s, %s, %s)",
             (appointment_id, offset_days, datetime.now(self.timezone).strftime("%Y-%m-%d %H:%M:%S")),
+        )
+
+    def mark_error(self, cursor, appointment_id: int) -> None:
+        cursor.execute(
+            f"UPDATE {self.table_prefix}appointments SET status = %s WHERE id = %s",
+            (self.error_status, appointment_id),
         )
 
     def publish(self, payload: dict) -> None:
