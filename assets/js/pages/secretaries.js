@@ -349,12 +349,30 @@ App.Pages.Secretaries = (function () {
                 throw new Error(lang('invalid_phone'));
             }
 
+            // Warn if phone starts with 8 (likely country code digit instead of local number).
+            const phoneDigitsVal = App.Utils.Validation.phoneDigits(phoneNumber);
+            if (phoneDigitsVal.length === 10 && phoneDigitsVal[0] === '8') {
+                if (!confirm(lang('phone_starts_with_8'))) {
+                    $phoneNumber.addClass('is-invalid');
+                    throw new Error(lang('invalid_phone'));
+                }
+            }
+
             // Validate mobile number.
             const mobileNumber = $mobileNumber.val();
 
             if (mobileNumber && !App.Utils.Validation.phone(mobileNumber)) {
                 $mobileNumber.addClass('is-invalid');
                 throw new Error(lang('invalid_phone'));
+            }
+
+            // Warn if mobile starts with 8 (likely country code digit instead of local number).
+            const mobileDigits = App.Utils.Validation.phoneDigits(mobileNumber);
+            if (mobileDigits.length === 10 && mobileDigits[0] === '8') {
+                if (!confirm(lang('phone_starts_with_8'))) {
+                    $mobileNumber.addClass('is-invalid');
+                    throw new Error(lang('invalid_phone'));
+                }
             }
 
             // Check if username exists

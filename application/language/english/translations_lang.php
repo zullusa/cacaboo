@@ -341,6 +341,7 @@ $lang['require'] = 'Require';
 $lang['color'] = 'Color';
 $lang['matomo_analytics_url_hint'] = 'Add the URL to your own Matomo installation to enable Matomo tracking on the booking pages.';
 $lang['invalid_phone'] = 'Invalid phone number.';
+$lang['phone_starts_with_8'] = 'Phone number starts with 8. The last digit may be incorrect. Check the number and press OK to save or Cancel to fix.';
 $lang['legal'] = 'Legal';
 $lang['business'] = 'Business';
 $lang['account'] = 'Account';

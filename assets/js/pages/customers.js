@@ -266,6 +266,15 @@ App.Pages.Customers = (function () {
                 throw new Error(lang('invalid_phone'));
             }
 
+            // Warn if phone starts with 8 (likely country code digit instead of local number).
+            const phoneDigits = App.Utils.Validation.phoneDigits(phoneNumber);
+            if (phoneDigits.length === 10 && phoneDigits[0] === '8') {
+                if (!confirm(lang('phone_starts_with_8'))) {
+                    $phoneNumber.addClass('is-invalid');
+                    throw new Error(lang('invalid_phone'));
+                }
+            }
+
             return true;
         } catch (error) {
             $formMessage.addClass('alert-danger').text(error.message).show();

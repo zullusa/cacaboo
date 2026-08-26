@@ -628,6 +628,15 @@ App.Components.AppointmentsModal = (function () {
                 throw new Error(lang('invalid_phone'));
             }
 
+            // Warn if phone starts with 8 (likely country code digit instead of local number).
+            const phoneDigits = App.Utils.Validation.phoneDigits(phoneInput);
+            if (phoneDigits.length === 10 && phoneDigits[0] === '8') {
+                if (!confirm(lang('phone_starts_with_8'))) {
+                    $appointmentsModal.find('#phone-number').addClass('is-invalid');
+                    throw new Error(lang('invalid_phone'));
+                }
+            }
+
             // Check appointment start and end time.
             const startDateTimeObject = App.Utils.UI.getDateTimePickerValue($startDatetime);
             const endDateTimeObject = App.Utils.UI.getDateTimePickerValue($endDatetime);
