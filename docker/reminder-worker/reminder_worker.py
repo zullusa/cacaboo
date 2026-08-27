@@ -145,6 +145,10 @@ class ReminderWorker:
         self.phone_prefix = env("REMINDER_PHONE_PREFIX", "+7")
         self.telegram_bot_token = env("TELEGRAM_BOT_TOKEN")
         self.telegram_channel_id = env("TELEGRAM_CHANNEL_ID")
+        self.telegram_proxy = env(
+            "TELEGRAM_PROXY",
+            env("HTTPS_PROXY", env("https_proxy")),
+        )
         self.should_stop = False
         self.schema_missing_logged = False
         self.heartbeat = int(env("RABBITMQ_HEARTBEAT", "60"))
@@ -421,7 +425,23 @@ class ReminderWorker:
         )
 
         try:
-            with urllib.request.urlopen(url, timeout=10) as response:
+            if self.telegram_proxy:
+                logger.info(
+                    "Sending Telegram notification through proxy %s",
+                    self.telegram_proxy,
+                )
+                proxy_handler = urllib.request.ProxyHandler({
+                    "https": self.telegram_proxy,
+                    "http": self.telegram_proxy,
+                })
+                opener = urllib.request.build_opener(proxy_handler)
+            else:
+                logger.info(
+                    "Sending Telegram notification directly (no proxy configured)",
+                )
+                opener = urllib.request.build_opener()
+
+            with opener.open(url, timeout=10) as response:
                 body = response.read()
                 logger.info(
                     "Telegram notification sent for appointment %s (invalid phone '%s')",

@@ -105,6 +105,7 @@ services:
       - CONTACT_PHONE=${CONTACT_PHONE}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHANNEL_ID=${TELEGRAM_CHANNEL_ID}
+      - TELEGRAM_PROXY=${TELEGRAM_PROXY}
     depends_on:
       - mysql
     restart: unless-stopped
