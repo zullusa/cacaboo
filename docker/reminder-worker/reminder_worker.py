@@ -19,6 +19,8 @@ import signal
 import sys
 import threading
 import time
+import urllib.request
+import urllib.parse
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -141,6 +143,8 @@ class ReminderWorker:
         self.booked_status = env("REMINDER_STATUS_BOOKED", "Записано")
         self.error_status = env("REMINDER_STATUS_ERROR", "Ошибка")
         self.phone_prefix = env("REMINDER_PHONE_PREFIX", "+7")
+        self.telegram_bot_token = env("TELEGRAM_BOT_TOKEN")
+        self.telegram_channel_id = env("TELEGRAM_CHANNEL_ID")
         self.should_stop = False
         self.schema_missing_logged = False
         self.heartbeat = int(env("RABBITMQ_HEARTBEAT", "60"))
@@ -294,6 +298,7 @@ class ReminderWorker:
                     appointment_id,
                     raw_phone,
                 )
+                self.notify_telegram(appointment, raw_phone)
                 self.mark_error(cursor, appointment_id)
                 self.mark_sent(cursor, appointment_id, days)
                 continue
@@ -343,7 +348,9 @@ class ReminderWorker:
                 a.notes,
                 COALESCE(s.name, '') AS appointment_type,
                 COALESCE(NULLIF(u.phone_number, ''), u.mobile_number, '') AS phone,
-                COALESCE(u.email, '') AS email
+                COALESCE(u.email, '') AS email,
+                COALESCE(u.first_name, '') AS first_name,
+                COALESCE(u.last_name, '') AS last_name
             FROM {self.table_prefix}appointments a
             LEFT JOIN {self.table_prefix}services s ON s.id = a.id_services
             LEFT JOIN {self.table_prefix}users u ON u.id = a.id_users_customer
@@ -377,6 +384,62 @@ class ReminderWorker:
             f"UPDATE {self.table_prefix}appointments SET status = %s WHERE id = %s",
             (self.error_status, appointment_id),
         )
+
+    def notify_telegram(self, appointment: dict, phone: str) -> None:
+        """Send a message to the configured Telegram channel about an invalid phone number."""
+        if not self.telegram_bot_token or not self.telegram_channel_id:
+            logger.warning(
+                "Telegram is not configured (missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHANNEL_ID); "
+                "skipping invalid phone notification for appointment %s",
+                appointment["id"],
+            )
+            return
+
+        first_name = (appointment.get("first_name") or "").strip()
+        last_name = (appointment.get("last_name") or "").strip()
+        customer_name = " ".join(part for part in (first_name, last_name) if part) or "—"
+
+        car_make = (appointment.get("car_make") or "").strip() or "—"
+        car_plate = (appointment.get("car_plate") or "").strip() or "—"
+        start_datetime = parse_start_datetime(appointment["start_datetime"])
+        start_time = start_datetime.strftime("%H:%M")
+        start_date = start_datetime.strftime("%d.%m.%Y")
+
+        text = (
+            "⚠️ Некорректный номер телефона\n"
+            f"👤 Клиент: {customer_name}\n"
+            f"🚗 Авто: {car_make}\n"
+            f"🔢 Регномер: {car_plate}\n"
+            f"📞 Телефон: {phone}\n"
+            f"🗓 Дата/время: {start_date} {start_time}"
+        )
+
+        url = (
+            f"https://api.telegram.org/bot{self.telegram_bot_token}/sendMessage"
+            f"?chat_id={urllib.parse.quote(str(self.telegram_channel_id))}"
+            f"&text={urllib.parse.quote(text)}"
+        )
+
+        try:
+            with urllib.request.urlopen(url, timeout=10) as response:
+                body = response.read()
+                logger.info(
+                    "Telegram notification sent for appointment %s (invalid phone '%s')",
+                    appointment["id"],
+                    phone,
+                )
+                if response.status != 200:
+                    logger.warning(
+                        "Telegram responded with status %s: %s",
+                        response.status,
+                        body.decode("utf-8", errors="replace")[:200],
+                    )
+        except Exception:
+            logger.exception(
+                "Could not send Telegram notification for appointment %s (invalid phone '%s')",
+                appointment["id"],
+                phone,
+            )
 
     def publish(self, payload: dict) -> None:
         credentials = pika.PlainCredentials(self.amqp_config["user"], self.amqp_config["password"])

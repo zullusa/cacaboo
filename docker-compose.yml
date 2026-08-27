@@ -103,6 +103,8 @@ services:
       - REMINDER_PHONE_PREFIX=${REMINDER_PHONE_PREFIX:-+7}
       - ADDRESS=${ADDRESS}
       - CONTACT_PHONE=${CONTACT_PHONE}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHANNEL_ID=${TELEGRAM_CHANNEL_ID}
     depends_on:
       - mysql
     restart: unless-stopped
