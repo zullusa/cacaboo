@@ -23,6 +23,12 @@ class Settings:
     notified_queue: str
     notified_exchange: str
     notified_routing_key: str
+    sms_poll_cron: str
+    telegram_bot_token: str
+    telegram_channel_id: str
+    telegram_proxy: str
+    sms_ignore_sender: str
+    sms_ignore_keywords: str
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -45,4 +51,16 @@ class Settings:
             notified_queue=environ.get("RABBITMQ_NOTIFIED_QUEUE", "notified"),
             notified_exchange=environ.get("RABBITMQ_NOTIFIED_EXCHANGE", "notified_exchange"),
             notified_routing_key=environ.get("RABBITMQ_NOTIFIED_ROUTING_KEY", "notified"),
+            sms_poll_cron=environ.get("SMS_POLL_CRON", "* * * * *"),
+            telegram_bot_token=environ.get("TELEGRAM_BOT_TOKEN", ""),
+            telegram_channel_id=environ.get("TELEGRAM_CHANNEL_ID", ""),
+            telegram_proxy=environ.get(
+                "TELEGRAM_PROXY",
+                environ.get("HTTPS_PROXY", environ.get("https_proxy", "")),
+            ),
+            sms_ignore_sender=environ.get("SMS_IGNORE_SENDER", "MegaFon"),
+            sms_ignore_keywords=environ.get(
+                "SMS_IGNORE_KEYWORDS",
+                "код подтверждения,код для входа,ваш код",
+            ),
         )

@@ -40,6 +40,7 @@ PORT = int(os.getenv("MOCK_PORT", "8080"))
 
 _sessions = {}
 _sent_sms = []
+_inbox = {}
 _lock = threading.Lock()
 
 
@@ -102,6 +103,10 @@ class KeeneticMockHandler(BaseHTTPRequestHandler):
                     {"count": len(_sent_sms), "messages": list(_sent_sms)},
                 )
 
+        if path == "/mock/sms/inbox":
+            with _lock:
+                return self._send_json(200, {"count": len(_inbox), "messages": dict(_inbox)})
+
         return self._send_json(404, {"error": "not found"})
 
     def do_POST(self):
@@ -113,6 +118,9 @@ class KeeneticMockHandler(BaseHTTPRequestHandler):
 
         if path in ("/rci/", "/rci"):
             return self._handle_rci(body)
+
+        if path == "/mock/sms/inbox":
+            return self._handle_seed_inbox(body)
 
         return self._send_json(404, {"error": "not found"})
 
@@ -193,22 +201,88 @@ class KeeneticMockHandler(BaseHTTPRequestHandler):
         commands = payload if isinstance(payload, list) else [payload]
         sms_id = uuid.uuid4().hex
 
+        response = {"result": "Ok", "id": sms_id}
+        responses_entries = []
+
         for command in commands:
-            sms = (command or {}).get("sms", {}).get("send")
-            if not sms:
+            cmd = command or {}
+            sms = cmd.get("sms", {})
+
+            # Outgoing SMS
+            send = sms.get("send")
+            if send:
+                with _lock:
+                    _sent_sms.append(
+                        {
+                            "id": sms_id,
+                            "interface": send.get("interface"),
+                            "to": send.get("to"),
+                            "message": send.get("message"),
+                        }
+                    )
+                logger.info("Mock SMS sent -> %s: %s", send.get("to"), send.get("message"))
                 continue
-            with _lock:
-                _sent_sms.append(
+
+            # Incoming SMS list
+            listing = sms.get("list")
+            if listing is not None:
+                with _lock:
+                    messages = dict(_inbox)
+                responses_entries.append(
                     {
-                        "id": sms_id,
-                        "interface": sms.get("interface"),
-                        "to": sms.get("to"),
-                        "message": sms.get("message"),
+                        "sms": {
+                            "list": {
+                                "nv-free-slots": 4,
+                                "nv-total-slots": 23,
+                                "sim-free-slots": 15,
+                                "sim-total-slots": 15,
+                                "messages-count": len(messages),
+                                "messages": messages,
+                            }
+                        }
                     }
                 )
-            logger.info("Mock SMS sent -> %s: %s", sms.get("to"), sms.get("message"))
+                logger.info("Mock SMS list returned %d message(s)", len(messages))
+                continue
 
-        return self._send_json(200, {"result": "Ok", "id": sms_id})
+            # Incoming SMS delete
+            delete = sms.get("delete")
+            if delete is not None:
+                for item in (delete if isinstance(delete, list) else [delete]):
+                    msg_id = (item or {}).get("id")
+                    if not msg_id:
+                        continue
+                    with _lock:
+                        removed = _inbox.pop(msg_id, None)
+                    if removed is not None:
+                        logger.info("Mock deleted SMS %s", msg_id)
+                    else:
+                        logger.warning("Mock delete SMS %s not found", msg_id)
+
+        # If there were list/delete commands, return an array of their responses.
+        if responses_entries:
+            return self._send_json(200, responses_entries)
+
+        return self._send_json(200, response)
+
+
+    def _handle_seed_inbox(self, body: bytes):
+        """Seed the SMS inbox via POST /mock/sms/inbox with {"messages": {id: {...}}}."""
+        try:
+            payload = json.loads(body or b"{}")
+        except json.JSONDecodeError:
+            return self._send_json(400, {"error": "bad request"})
+
+        messages = payload.get("messages", {})
+        if not isinstance(messages, dict):
+            return self._send_json(400, {"error": "messages must be an object"})
+
+        with _lock:
+            for msg_id, msg in messages.items():
+                _inbox[msg_id] = msg
+
+        logger.info("Mock inbox seeded with %d message(s)", len(messages))
+        return self._send_json(200, {"result": "seeded", "count": len(messages)})
 
 
 def main() -> None:

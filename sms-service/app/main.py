@@ -7,6 +7,7 @@ from app.services.dispatcher import SmsDispatchService
 from app.services.notified_publisher import RabbitMqNotifiedPublisher
 from app.services.rabbitmq_consumer import RabbitMqConsumer
 from app.services.sms_sender import KeeneticSmsSender
+from app.services.sms_poller import SmsPoller
 
 
 def build_settings() -> Settings:
@@ -53,6 +54,27 @@ def main() -> int:
         routing_key=settings.notified_routing_key,
         heartbeat=settings.rabbitmq_heartbeat,
     )
+
+    if settings.telegram_bot_token and settings.telegram_channel_id:
+        poller = SmsPoller(
+            authenticator=authenticator,
+            base_url=settings.modem_url_base,
+            interface_name=settings.modem_name,
+            telegram_bot_token=settings.telegram_bot_token,
+            telegram_channel_id=settings.telegram_channel_id,
+            cron_expression=settings.sms_poll_cron,
+            telegram_proxy=settings.telegram_proxy or None,
+            ignore_sender=settings.sms_ignore_sender,
+            ignore_keywords=tuple(
+                k.strip() for k in settings.sms_ignore_keywords.split(",") if k.strip()
+            ),
+        )
+        poller.start()
+    else:
+        logging.getLogger(__name__).warning(
+            "SMS poller disabled (TELEGRAM_BOT_TOKEN or TELEGRAM_CHANNEL_ID not set)"
+        )
+
     SmsDispatchService(
         consumer=consumer,
         sender=sender,

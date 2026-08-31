@@ -152,6 +152,12 @@ services:
       - RABBITMQ_NOTIFIED_QUEUE=${RABBITMQ_NOTIFIED_QUEUE:-notified_dev}
       - RABBITMQ_NOTIFIED_EXCHANGE=${RABBITMQ_NOTIFIED_EXCHANGE:-notified_exchange_dev}
       - RABBITMQ_NOTIFIED_ROUTING_KEY=${RABBITMQ_NOTIFIED_ROUTING_KEY:-notified_dev}
+      - SMS_POLL_CRON=${SMS_POLL_CRON:-* * * * *}
+      - SMS_IGNORE_SENDER=${SMS_IGNORE_SENDER:-MegaFon}
+      - SMS_IGNORE_KEYWORDS=${SMS_IGNORE_KEYWORDS:-код подтверждения,код для входа,ваш код}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHANNEL_ID=${TELEGRAM_CHANNEL_ID}
+      - TELEGRAM_PROXY=${TELEGRAM_PROXY}
     depends_on:
       - mysql
     restart: unless-stopped
