@@ -105,9 +105,9 @@ def _to_int(value) -> int | None:
 
 def build_message(start_datetime: datetime) -> str:
     return (
-        f"Добрый день! Напоминаем, что вы записаны на СТО по адресу "
+        f"Добрый день! Вы записаны на СТО по адресу "
         f"{ADDRESS} в {start_datetime:%H:%M} {start_datetime:%d.%m.%Y}. "
-        f"Телефон для связи с нами {CONTACT_PHONE}."
+        f"Связь с нами {CONTACT_PHONE}"
     )
 
 

@@ -562,7 +562,7 @@ class Calendar extends EA_Controller
                 'email' => (string) ($customer['email'] ?? ''),
                 'subject' => config('reminder_subject'),
                 'message' => sprintf(
-                    'Добрый день! Напоминаем, что вы записаны на СТО по адресу %s в %s %s. Телефон для связи с нами %s.',
+                    'Добрый день! Вы записаны на СТО по адресу %s в %s %s. Связь с нами %s',
                     config('reminder_address'),
                     $start->format('H:i'),
                     $start->format('d.m.Y'),
