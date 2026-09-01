@@ -1,23 +1,36 @@
 import logging
 import sys
+from dataclasses import dataclass
 
 from app.config import Settings
+from app.services import dispatcher as dispatcher_module
 from app.services.authenticator import KeeneticAuthenticator
 from app.services.dispatcher import SmsDispatchService
 from app.services.notified_publisher import RabbitMqNotifiedPublisher
 from app.services.rabbitmq_consumer import RabbitMqConsumer
 from app.services.sms_aero import SmsAeroSmsSender
+from app.services.sms_ru import SmsRuSmsSender
 from app.services.sms_sender import KeeneticSmsSender
 from app.services.sms_poller import SmsPoller
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class SenderConfig:
+    """Resolved SMS sender plus optional delivery-status watching settings."""
+
+    sender: object
+    status_checker: object | None
+    status_timeout: int
+    status_poll_interval: int
+
+
 def build_settings() -> Settings:
     return Settings.from_env()
 
 
-def _build_keenetic(settings: Settings):
+def _build_keenetic(settings: Settings) -> SenderConfig:
     authenticator = KeeneticAuthenticator(
         base_url=settings.modem_url_base,
         login=settings.modem_user,
@@ -28,31 +41,55 @@ def _build_keenetic(settings: Settings):
         interface_name=settings.modem_name,
         base_url=settings.modem_url_base,
     )
-    return sender, None
+    return SenderConfig(sender=sender, status_checker=None, status_timeout=0, status_poll_interval=0)
 
 
-def _build_smsaero(settings: Settings) -> tuple:
-    if not settings.smsaero_email or not settings.smsaero_api_key:
+def _build_smsaero(settings: Settings) -> SenderConfig:
+    if not settings.smsaero_email or not settings.sms_gate_api_key:
         raise RuntimeError(
-            "SMS_PROVIDER=smsaero requires SMSAERO_EMAIL and SMSAERO_API_KEY"
+            "SMS_PROVIDER=smsaero requires SMSAERO_EMAIL and SMS_GATE_API_KEY"
         )
     sender = SmsAeroSmsSender(
         email=settings.smsaero_email,
-        api_key=settings.smsaero_api_key,
-        sign=settings.smsaero_sign or None,
+        api_key=settings.sms_gate_api_key,
+        sign=settings.sms_gate_from or None,
         channel=settings.smsaero_channel or None,
     )
-    return sender, sender
+    return SenderConfig(
+        sender=sender,
+        status_checker=sender,
+        status_timeout=settings.sms_gate_status_timeout,
+        status_poll_interval=settings.sms_gate_status_poll_interval,
+    )
 
 
-def _build_sender(settings: Settings) -> tuple:
+def _build_smsru(settings: Settings) -> SenderConfig:
+    if not settings.sms_gate_api_key:
+        raise RuntimeError(
+            "SMS_PROVIDER=smsru requires SMS_GATE_API_KEY (see https://sms.ru)"
+        )
+    sender = SmsRuSmsSender(
+        api_id=settings.sms_gate_api_key,
+        from_name=settings.sms_gate_from or None,
+    )
+    return SenderConfig(
+        sender=sender,
+        status_checker=sender,
+        status_timeout=settings.sms_gate_status_timeout,
+        status_poll_interval=settings.sms_gate_status_poll_interval,
+    )
+
+
+def _build_sender(settings: Settings) -> SenderConfig:
+    if settings.sms_provider == "smsru":
+        return _build_smsru(settings)
     if settings.sms_provider == "smsaero":
         return _build_smsaero(settings)
     if settings.sms_provider == "keenetic":
         return _build_keenetic(settings)
     raise RuntimeError(
         f"Unknown SMS_PROVIDER={settings.sms_provider!r} "
-        "(expected 'keenetic' or 'smsaero')"
+        "(expected 'keenetic', 'smsaero' or 'smsru')"
     )
 
 
@@ -63,7 +100,9 @@ def main() -> int:
     )
     settings = build_settings()
 
-    sender, status_checker = _build_sender(settings)
+    sender_config = _build_sender(settings)
+    sender = sender_config.sender
+    status_checker = sender_config.status_checker
     consumer = RabbitMqConsumer(
         host=settings.rabbitmq_host,
         port=settings.rabbitmq_port,
@@ -122,6 +161,16 @@ def main() -> int:
         sender=sender,
         notified_publisher=notified_publisher,
         status_checker=status_checker,
+        status_timeout=(
+            sender_config.status_timeout
+            if status_checker
+            else dispatcher_module.STATUS_TIMEOUT
+        ),
+        status_poll_interval=(
+            sender_config.status_poll_interval
+            if status_checker
+            else dispatcher_module.STATUS_POLL_INTERVAL
+        ),
     ).run()
     return 0
 

@@ -11,12 +11,12 @@ class Settings:
     modem_user: str
     modem_password: str
     modem_url_base: str
+    sms_gate_api_key: str
     smsaero_email: str
-    smsaero_api_key: str
-    smsaero_sign: str
     smsaero_channel: str
-    smsaero_status_timeout: int
-    smsaero_status_poll_interval: int
+    sms_gate_status_timeout: int
+    sms_gate_status_poll_interval: int
+    sms_gate_from: str
     rabbitmq_host: str
     rabbitmq_port: int
     rabbitmq_user: str
@@ -46,14 +46,14 @@ class Settings:
             modem_user=environ.get("MODEM_USER", "samsa"),
             modem_password=environ.get("MODEM_PASSWORD", "samsa"),
             modem_url_base=environ.get("MODEM_URL_BASE", "http://192.168.0.1"),
+            sms_gate_api_key=environ.get("SMS_GATE_API_KEY", ""),
             smsaero_email=environ.get("SMSAERO_EMAIL", ""),
-            smsaero_api_key=environ.get("SMSAERO_API_KEY", ""),
-            smsaero_sign=environ.get("SMSAERO_SIGN", ""),
             smsaero_channel=environ.get("SMSAERO_CHANNEL", ""),
-            smsaero_status_timeout=int(environ.get("SMSAERO_STATUS_TIMEOUT", "120")),
-            smsaero_status_poll_interval=int(
-                environ.get("SMSAERO_STATUS_POLL_INTERVAL", "10")
+            sms_gate_status_timeout=int(environ.get("SMS_GATE_STATUS_TIMEOUT", "120")),
+            sms_gate_status_poll_interval=int(
+                environ.get("SMS_GATE_STATUS_POLL_INTERVAL", "10")
             ),
+            sms_gate_from=environ.get("SMS_GATE_FROM", ""),
             rabbitmq_host=environ.get("RABBITMQ_HOST", "rabbitmq"),
             rabbitmq_port=int(environ.get("RABBITMQ_PORT", "5672")),
             rabbitmq_user=environ.get("RABBITMQ_USER", "sms"),
