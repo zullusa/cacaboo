@@ -7,7 +7,11 @@ class AuthenticationError(SmsServiceError):
 
 
 class SmsSendError(SmsServiceError):
-    """Raised when an SMS could not be delivered to the modem."""
+    """Raised when an SMS could not be delivered to the gateway."""
+
+
+class SmsStatusError(SmsServiceError):
+    """Raised when a gateway delivery status could not be retrieved."""
 
 
 class InvalidMessageError(SmsServiceError):

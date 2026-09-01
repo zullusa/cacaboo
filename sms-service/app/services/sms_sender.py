@@ -38,6 +38,7 @@ class KeeneticSmsSender(SmsSender):
             self._session, self._headers = self._authenticator.authenticate()
             response = self._post(message)
         self._raise_for_send_status(response)
+        return None
 
     def _post(self, message: SmsMessage) -> requests.Response:
         if self._session is None or self._headers is None:
