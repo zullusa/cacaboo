@@ -8,7 +8,9 @@ from app.services.authenticator import KeeneticAuthenticator
 from app.services.delayed_publisher import RabbitMqDelayedPublisher
 from app.services.dispatcher import SmsDispatchService
 from app.services.notified_publisher import RabbitMqNotifiedPublisher
+from app.services.operator_lookup import OperatorLookup
 from app.services.rabbitmq_consumer import RabbitMqConsumer
+from app.services.routing_sender import RoutingSmsSender
 from app.services.sms_aero import SmsAeroSmsSender
 from app.services.sms_ru import SmsRuSmsSender
 from app.services.sms_sender import KeeneticSmsSender
@@ -81,6 +83,37 @@ def _build_smsru(settings: Settings) -> SenderConfig:
     )
 
 
+def _build_routing(settings: Settings) -> SenderConfig:
+    """SMS_PROVIDER=routing: Megafon via Keenetic modem, everyone else via sms.ru.
+
+    The operator is resolved per number through the BDPN lookup (nic-t.ru)
+    and the matching sender is used. sms.ru is the default (and provides the
+    delivery-tracking id, since modem reports are unavailable).
+    """
+    if not settings.sms_gate_api_key:
+        raise RuntimeError(
+            "SMS_PROVIDER=routing requires SMS_GATE_API_KEY (sms.ru for "
+            "non-Megafon numbers)"
+        )
+    keenetic_cfg = _build_keenetic(settings)
+    smsru_cfg = _build_smsru(settings)
+    lookup = OperatorLookup(
+        url=settings.sms_mno_lookup_url,
+        timeout=settings.sms_mno_lookup_timeout,
+    )
+    sender = RoutingSmsSender(
+        operator_lookup=lookup,
+        operator_sender_map={"мегафон": keenetic_cfg.sender},
+        default_sender=smsru_cfg.sender,
+    )
+    return SenderConfig(
+        sender=sender,
+        status_checker=sender,
+        status_timeout=smsru_cfg.status_timeout,
+        status_poll_interval=smsru_cfg.status_poll_interval,
+    )
+
+
 def _build_sender(settings: Settings) -> SenderConfig:
     if settings.sms_provider == "smsru":
         return _build_smsru(settings)
@@ -88,9 +121,11 @@ def _build_sender(settings: Settings) -> SenderConfig:
         return _build_smsaero(settings)
     if settings.sms_provider == "keenetic":
         return _build_keenetic(settings)
+    if settings.sms_provider == "routing":
+        return _build_routing(settings)
     raise RuntimeError(
         f"Unknown SMS_PROVIDER={settings.sms_provider!r} "
-        "(expected 'keenetic', 'smsaero' or 'smsru')"
+        "(expected 'keenetic', 'smsaero', 'smsru' or 'routing')"
     )
 
 
@@ -138,7 +173,7 @@ def main() -> int:
     )
 
     if (
-        settings.sms_provider == "keenetic"
+        settings.sms_provider in ("keenetic", "routing")
         and settings.telegram_bot_token
         and settings.telegram_channel_id
     ):

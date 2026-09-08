@@ -166,6 +166,8 @@ services:
       - SMS_POLL_CRON=${SMS_POLL_CRON:-* * * * *}
       - SMS_IGNORE_SENDER=${SMS_IGNORE_SENDER:-MegaFon}
       - SMS_IGNORE_KEYWORDS=${SMS_IGNORE_KEYWORDS:-код подтверждения,код для входа,ваш код}
+      - SMS_MNO_LOOKUP_URL=${SMS_MNO_LOOKUP_URL:-https://www.nic-t.ru/bdpn/bdpn-proverka-nomera/}
+      - SMS_MNO_LOOKUP_TIMEOUT=${SMS_MNO_LOOKUP_TIMEOUT:-15}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHANNEL_ID=${TELEGRAM_CHANNEL_ID}
       - TELEGRAM_PROXY=${TELEGRAM_PROXY}

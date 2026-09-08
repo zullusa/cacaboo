@@ -40,6 +40,8 @@ class Settings:
     telegram_proxy: str
     sms_ignore_sender: str
     sms_ignore_keywords: str
+    sms_mno_lookup_url: str
+    sms_mno_lookup_timeout: float
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -87,4 +89,9 @@ class Settings:
                 "SMS_IGNORE_KEYWORDS",
                 "код подтверждения,код для входа,ваш код",
             ),
+            sms_mno_lookup_url=environ.get(
+                "SMS_MNO_LOOKUP_URL",
+                "https://www.nic-t.ru/bdpn/bdpn-proverka-nomera/",
+            ),
+            sms_mno_lookup_timeout=float(environ.get("SMS_MNO_LOOKUP_TIMEOUT", "15")),
         )
