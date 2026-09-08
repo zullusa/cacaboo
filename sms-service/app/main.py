@@ -114,6 +114,7 @@ def main() -> int:
         routing_key=settings.rabbitmq_routing_key,
         heartbeat=settings.rabbitmq_heartbeat,
         reconnect_delay=settings.rabbitmq_reconnect_delay,
+        delayed_queue=settings.sms_delayed_queue,
     )
     notified_publisher = RabbitMqNotifiedPublisher(
         host=settings.rabbitmq_host,

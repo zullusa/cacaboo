@@ -11,12 +11,22 @@ import time
 import requests
 
 from app.domain.models import SmsMessage
-from app.errors import SmsSendError, SmsStatusError
+from app.errors import SmsDelayedError, SmsSendError, SmsStatusError
 from app.interfaces.protocols import SmsSender, SmsStatusChecker
 
 logger = logging.getLogger(__name__)
 
 SMSRU_BASE = "https://sms.ru"
+
+# sms.ru status_code values that are transient account / per-number send
+# limits. They resolve on their own with time, so such messages are moved to
+# a delayed queue instead of retried immediately.
+_DEFERABLE_LIMIT_CODES = {
+    230,  # общий лимит сообщений на номер в день
+    231,  # лимит одинаковых сообщений на номер в минуту
+    232,  # лимит одинаковых сообщений на номер в день
+    233,  # защита от мошенников (повторные коды)
+}
 
 # sms.ru status_code values (see /api/status).
 _STATUS_DELIVERED = 103
@@ -83,11 +93,15 @@ class SmsRuSmsSender(SmsSender, SmsStatusChecker):
 
         sms = payload.get("sms") or {}
         entry = sms.get(message.phone_number) or {}
+        status_code = entry.get("status_code")
         if entry.get("status") != "OK":
-            raise SmsSendError(
+            detail = (
                 f"sms.ru rejected message to {message.phone_number}: "
-                f"code={entry.get('status_code')} text={entry.get('status_text')!r}"
+                f"code={status_code} text={entry.get('status_text')!r}"
             )
+            if status_code in _DEFERABLE_LIMIT_CODES:
+                raise SmsDelayedError(detail)
+            raise SmsSendError(detail)
 
         tracking_id = entry.get("sms_id")
         if not tracking_id:

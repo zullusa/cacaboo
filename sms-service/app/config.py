@@ -30,6 +30,7 @@ class Settings:
     notified_queue: str
     notified_exchange: str
     notified_routing_key: str
+    sms_delayed_queue: str
     sms_poll_cron: str
     telegram_bot_token: str
     telegram_channel_id: str
@@ -67,6 +68,7 @@ class Settings:
             notified_queue=environ.get("RABBITMQ_NOTIFIED_QUEUE", "notified"),
             notified_exchange=environ.get("RABBITMQ_NOTIFIED_EXCHANGE", "notified_exchange"),
             notified_routing_key=environ.get("RABBITMQ_NOTIFIED_ROUTING_KEY", "notified"),
+            sms_delayed_queue=environ.get("SMS_DELAYED_QUEUE", "sms_delayed"),
             sms_poll_cron=environ.get("SMS_POLL_CRON", "* * * * *"),
             telegram_bot_token=environ.get("TELEGRAM_BOT_TOKEN", ""),
             telegram_channel_id=environ.get("TELEGRAM_CHANNEL_ID", ""),

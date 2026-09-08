@@ -5,7 +5,7 @@ from typing import Callable
 import pika
 
 from app.domain.models import SmsMessage
-from app.errors import InvalidMessageError, SmsServiceError
+from app.errors import InvalidMessageError, SmsDelayedError, SmsServiceError
 from app.interfaces.protocols import MessageConsumer
 
 logger = logging.getLogger(__name__)
@@ -17,6 +17,10 @@ class RabbitMqConsumer(MessageConsumer):
     Single responsibility: take raw messages off the queue, hand parsed
     ``SmsMessage`` objects to the handler and acknowledge/reject them
     accordingly. It does not know anything about SMS sending.
+
+    Messages that raise ``SmsDelayedError`` are moved to the ``delayed``
+    queue (instead of being requeued or dropped): the original message is
+    acknowledged so it leaves the notification queue.
     """
 
     def __init__(
@@ -31,6 +35,7 @@ class RabbitMqConsumer(MessageConsumer):
         routing_key: str = "",
         heartbeat: int = 30,
         reconnect_delay: int = 5,
+        delayed_queue: str = "",
     ) -> None:
         self._host = host
         self._port = port
@@ -41,6 +46,7 @@ class RabbitMqConsumer(MessageConsumer):
         self._routing_key = routing_key or queue_name
         self._heartbeat = heartbeat
         self._reconnect_delay = reconnect_delay
+        self._delayed_queue = delayed_queue
         self._connection = None
         self._channel = None
 
@@ -78,6 +84,8 @@ class RabbitMqConsumer(MessageConsumer):
         self._connection = pika.BlockingConnection(parameters)
         self._channel = self._connection.channel()
         self._channel.queue_declare(queue=self._queue_name, durable=True)
+        if self._delayed_queue:
+            self._channel.queue_declare(queue=self._delayed_queue, durable=True)
 
         if self._exchange:
             self._channel.exchange_declare(
@@ -99,6 +107,10 @@ class RabbitMqConsumer(MessageConsumer):
                 return
             try:
                 handler(message)
+            except SmsDelayedError as exc:
+                logger.error("Message deferred (%s); moving to delayed queue", exc)
+                self._move_to_delayed(ch, body, exc, method.delivery_tag)
+                return
             except SmsServiceError as exc:
                 logger.error("Failed to process message, requeueing: %s", exc)
                 ch.basic_nack(method.delivery_tag, requeue=True)
@@ -107,6 +119,32 @@ class RabbitMqConsumer(MessageConsumer):
             logger.info("SMS %s delivered to %s", message.text, message.phone_number)
 
         return callback
+
+    def _move_to_delayed(self, ch, body: bytes, exc, delivery_tag) -> None:
+        if not self._delayed_queue:
+            logger.error(
+                "No delayed queue configured; requeueing %s instead: %s", body[:200], exc
+            )
+            ch.basic_nack(delivery_tag, requeue=True)
+            return
+        try:
+            self._channel.basic_publish(
+                exchange="",
+                routing_key=self._delayed_queue,
+                body=body,
+                properties=pika.BasicProperties(delivery_mode=2),
+            )
+            ch.basic_ack(delivery_tag)
+            logger.info(
+                "Message moved to delayed queue %r", self._delayed_queue
+            )
+        except Exception as publish_exc:  # noqa: BLE001
+            logger.error(
+                "Failed to move message to delayed queue %r; requeueing: %s",
+                self._delayed_queue,
+                publish_exc,
+            )
+            ch.basic_nack(delivery_tag, requeue=True)
 
     def close(self) -> None:
         if self._channel is not None and self._channel.is_open:
