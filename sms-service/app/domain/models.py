@@ -72,3 +72,19 @@ class SmsMessage:
                 f"Message must be a JSON object, got {type(payload).__name__}"
             )
         return cls.from_dict(payload)
+
+    def to_dict(self) -> dict:
+        """Serialize back into the canonical outgoing message shape."""
+        body: dict = {
+            "phone_number": self.phone_number,
+            "text": self.text,
+        }
+        if self.appointment_id is not None:
+            body["appointment_id"] = self.appointment_id
+        if self.offset_days is not None:
+            body["offset_days"] = self.offset_days
+        return body
+
+    def to_json(self) -> str:
+        """Serialize back into JSON (used e.g. for the delayed queue)."""
+        return json.dumps(self.to_dict(), ensure_ascii=False)

@@ -1,26 +1,22 @@
 import logging
 import time
-from typing import Callable
 
 import pika
 
 from app.domain.models import SmsMessage
-from app.errors import InvalidMessageError, SmsDelayedError, SmsServiceError
+from app.errors import InvalidMessageError
 from app.interfaces.protocols import MessageConsumer
 
 logger = logging.getLogger(__name__)
 
 
 class RabbitMqConsumer(MessageConsumer):
-    """Blocking RabbitMQ consumer that runs forever and reconnects on failure.
+    """Pulls SMS messages off a RabbitMQ queue in batch (drain) mode.
 
-    Single responsibility: take raw messages off the queue, hand parsed
-    ``SmsMessage`` objects to the handler and acknowledge/reject them
-    accordingly. It does not know anything about SMS sending.
-
-    Messages that raise ``SmsDelayedError`` are moved to the ``delayed``
-    queue (instead of being requeued or dropped): the original message is
-    acknowledged so it leaves the notification queue.
+    Every ``drain()`` call fetches all currently available messages with
+    ``basic_get`` and acknowledges each one immediately, so messages are
+    extracted from the queue as they are handed to the caller. Processing
+    afterwards happens in worker threads owned by the dispatch service.
     """
 
     def __init__(
@@ -35,7 +31,6 @@ class RabbitMqConsumer(MessageConsumer):
         routing_key: str = "",
         heartbeat: int = 30,
         reconnect_delay: int = 5,
-        delayed_queue: str = "",
     ) -> None:
         self._host = host
         self._port = port
@@ -46,46 +41,59 @@ class RabbitMqConsumer(MessageConsumer):
         self._routing_key = routing_key or queue_name
         self._heartbeat = heartbeat
         self._reconnect_delay = reconnect_delay
-        self._delayed_queue = delayed_queue
         self._connection = None
         self._channel = None
 
-    def consume(self, handler: Callable[[SmsMessage], None]) -> None:
+    def drain(self, max_messages: int | None = None) -> list[SmsMessage]:
+        """Extract (ack) all available messages and parse them to SmsMessage.
+
+        The channel must already be connected (``ensure_channel``). Returns
+        the list of successfully parsed messages; malformed messages are
+        nack'ed (removed without requeue) so they cannot poison the queue.
+        """
+        if self._channel is None or not self._channel.is_open:
+            self.ensure_channel()
+
+        messages: list[SmsMessage] = []
         while True:
             try:
-                self._connect()
-                self._channel.basic_qos(prefetch_count=1)
-                self._channel.basic_consume(
-                    queue=self._queue_name,
-                    on_message_callback=self._make_callback(handler),
-                    auto_ack=False,
+                method, _properties, body = self._channel.basic_get(
+                    queue=self._queue_name, auto_ack=False
                 )
-                logger.info(
-                    "Listening on queue %r (host=%s)", self._queue_name, self._host
-                )
-                self._channel.start_consuming()
-            except KeyboardInterrupt:
-                logger.info("Stopping consumer")
+            except pika.exceptions.AMQPError as exc:
+                logger.warning("basic_get failed (%s); reconnecting", exc)
                 self.close()
-                return
-            except Exception as exc:  # noqa: BLE001 - reconnect on any broker error
-                logger.exception("RabbitMQ error (%s); reconnecting", exc)
-                self.close()
-                time.sleep(self._reconnect_delay)
+                self.ensure_channel()
+                continue
 
-    def _connect(self) -> None:
-        parameters = pika.ConnectionParameters(
-            host=self._host,
-            port=self._port,
-            virtual_host=self._vhost,
-            credentials=self._credentials,
-            heartbeat=self._heartbeat,
-        )
-        self._connection = pika.BlockingConnection(parameters)
+            if method is None:
+                break
+
+            try:
+                message = SmsMessage.from_json(body)
+            except InvalidMessageError as exc:
+                logger.error("Dropping malformed message: %s", exc)
+                self._channel.basic_nack(method.delivery_tag, requeue=False)
+                continue
+
+            self._channel.basic_ack(method.delivery_tag)
+            messages.append(message)
+
+            if max_messages is not None and len(messages) >= max_messages:
+                break
+
+        return messages
+
+    def ensure_channel(self) -> None:
+        """(Re)connect and declare/bind the queue. Safe to call repeatedly."""
+        if self._connection is not None and self._connection.is_open:
+            if self._channel is not None and self._channel.is_open:
+                return
+            self._connection.close()
+
+        self._connection = pika.BlockingConnection(self._parameters())
         self._channel = self._connection.channel()
         self._channel.queue_declare(queue=self._queue_name, durable=True)
-        if self._delayed_queue:
-            self._channel.queue_declare(queue=self._delayed_queue, durable=True)
 
         if self._exchange:
             self._channel.exchange_declare(
@@ -97,54 +105,18 @@ class RabbitMqConsumer(MessageConsumer):
                 routing_key=self._routing_key,
             )
 
-    def _make_callback(self, handler: Callable[[SmsMessage], None]):
-        def callback(ch, method, properties, body: bytes) -> None:
-            try:
-                message = SmsMessage.from_json(body)
-            except InvalidMessageError as exc:
-                logger.error("Rejecting malformed message: %s", exc)
-                ch.basic_nack(method.delivery_tag, requeue=False)
-                return
-            try:
-                handler(message)
-            except SmsDelayedError as exc:
-                logger.error("Message deferred (%s); moving to delayed queue", exc)
-                self._move_to_delayed(ch, body, exc, method.delivery_tag)
-                return
-            except SmsServiceError as exc:
-                logger.error("Failed to process message, requeueing: %s", exc)
-                ch.basic_nack(method.delivery_tag, requeue=True)
-                return
-            ch.basic_ack(method.delivery_tag)
-            logger.info("SMS %s delivered to %s", message.text, message.phone_number)
+        logger.info(
+            "Connected to queue %r (host=%s)", self._queue_name, self._host
+        )
 
-        return callback
-
-    def _move_to_delayed(self, ch, body: bytes, exc, delivery_tag) -> None:
-        if not self._delayed_queue:
-            logger.error(
-                "No delayed queue configured; requeueing %s instead: %s", body[:200], exc
-            )
-            ch.basic_nack(delivery_tag, requeue=True)
-            return
-        try:
-            self._channel.basic_publish(
-                exchange="",
-                routing_key=self._delayed_queue,
-                body=body,
-                properties=pika.BasicProperties(delivery_mode=2),
-            )
-            ch.basic_ack(delivery_tag)
-            logger.info(
-                "Message moved to delayed queue %r", self._delayed_queue
-            )
-        except Exception as publish_exc:  # noqa: BLE001
-            logger.error(
-                "Failed to move message to delayed queue %r; requeueing: %s",
-                self._delayed_queue,
-                publish_exc,
-            )
-            ch.basic_nack(delivery_tag, requeue=True)
+    def _parameters(self) -> pika.ConnectionParameters:
+        return pika.ConnectionParameters(
+            host=self._host,
+            port=self._port,
+            virtual_host=self._vhost,
+            credentials=self._credentials,
+            heartbeat=self._heartbeat,
+        )
 
     def close(self) -> None:
         if self._channel is not None and self._channel.is_open:

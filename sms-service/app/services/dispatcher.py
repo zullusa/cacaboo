@@ -1,7 +1,13 @@
 import logging
+import queue
+import threading
+import time
+from dataclasses import dataclass
 
 from app.domain.models import SmsMessage
+from app.errors import SmsDelayedError, SmsServiceError
 from app.interfaces.protocols import (
+    DelayedPublisher,
     MessageConsumer,
     NotifiedPublisher,
     SmsSender,
@@ -10,23 +16,34 @@ from app.interfaces.protocols import (
 
 logger = logging.getLogger(__name__)
 
-# How long to wait for a gateway delivery report before giving up and not
-# acknowledging the message.
 STATUS_TIMEOUT = float(120)
 STATUS_POLL_INTERVAL = float(10)
+DRAIN_INTERVAL = float(1.0)
+
+_SENTINEL = object()
+
+
+@dataclass
+class _PendingStatus:
+    message: SmsMessage
+    tracking_id: str
 
 
 class SmsDispatchService:
-    """Orchestrates the flow: consume -> send -> (await status) -> notify.
+    """Orchestrates: drain queue -> send via gateway -> (await status) -> notify.
+
+    The queue is drained in batch: every message is extracted from the broker
+    in the main loop, then handled concurrently by two pools of worker
+    threads:
+
+      * send workers call ``SmsSender.send()`` and, on a transient failure,
+        move the message to the delayed queue;
+      * status workers poll the gateway delivery status and only publish the
+        confirmed-delivery notification to the notified queue.
 
     Depends on abstractions (MessageConsumer, SmsSender, SmsStatusChecker,
-    NotifiedPublisher) that are injected, so it never knows about RabbitMQ
-    or a concrete gateway (DIP).
-
-    When the sender returns a tracking id, the message is acknowledged to
-    the notified queue only after the delivery status is confirmed as
-    successful. Senders without status reporting (e.g. a modem) are
-    acknowledged right after the accept.
+    NotifiedPublisher, DelayedPublisher) injected in, so it never knows about
+    RabbitMQ or a concrete gateway (DIP).
     """
 
     def __init__(
@@ -35,49 +52,169 @@ class SmsDispatchService:
         sender: SmsSender,
         notified_publisher: NotifiedPublisher | None = None,
         status_checker: SmsStatusChecker | None = None,
+        delayed_publisher: DelayedPublisher | None = None,
         status_timeout: float = STATUS_TIMEOUT,
         status_poll_interval: float = STATUS_POLL_INTERVAL,
+        drain_interval: float = DRAIN_INTERVAL,
+        send_workers: int = 4,
+        status_workers: int = 4,
     ) -> None:
         self._consumer = consumer
         self._sender = sender
         self._notified_publisher = notified_publisher
         self._status_checker = status_checker
+        self._delayed_publisher = delayed_publisher
         self._status_timeout = status_timeout
         self._status_poll_interval = status_poll_interval
+        self._drain_interval = drain_interval
+        self._send_workers = max(1, send_workers)
+        self._status_workers = max(1, status_workers)
+
+        self._to_send: queue.Queue = queue.Queue()
+        self._to_check: queue.Queue = queue.Queue()
+        self._stop = threading.Event()
 
     def run(self) -> None:
         logger.info("SMS dispatch service started")
-        self._consumer.consume(self._handle)
+        threads = [
+            threading.Thread(target=self._send_loop, name=f"sms-send-{i}", daemon=True)
+            for i in range(self._send_workers)
+        ] + [
+            threading.Thread(
+                target=self._status_loop, name=f"sms-status-{i}", daemon=True
+            )
+            for i in range(self._status_workers)
+        ]
+        for t in threads:
+            t.start()
 
-    def _handle(self, message: SmsMessage) -> None:
+        try:
+            self._drain_loop()
+        except KeyboardInterrupt:
+            logger.info("Stopping SMS dispatch service")
+            self._stop.set()
+            for _ in range(self._send_workers):
+                self._to_send.put(_SENTINEL)
+            for _ in range(self._status_workers):
+                self._to_check.put(_SENTINEL)
+
+    # ── main loop: extract everything from the queue ───────────────────
+
+    def _drain_loop(self) -> None:
+        while not self._stop.is_set():
+            try:
+                messages = self._consumer.drain()
+            except SmsDelayedError:
+                # Not expected here; just log and keep going.
+                logger.exception("Unexpected SmsDelayedError during drain")
+                self._sleep_or_stop()
+                continue
+            except Exception:  # noqa: BLE001 - keep the drain loop alive
+                logger.exception("Drain failed; retrying in %.0fs", self._drain_interval)
+                self._sleep_or_stop()
+                continue
+
+            if not messages:
+                self._sleep_or_stop()
+                continue
+
+            logger.info("Extracted %d message(s) from the queue", len(messages))
+            for message in messages:
+                self._to_send.put(message)
+
+    def _sleep_or_stop(self) -> None:
+        self._stop.wait(timeout=self._drain_interval)
+
+    # ── send workers ───────────────────────────────────────────────────
+
+    def _send_loop(self) -> None:
+        while True:
+            item = self._to_send.get()
+            if item is _SENTINEL:
+                return
+            self._handle_send(item)
+
+    def _handle_send(self, message: SmsMessage) -> None:
         logger.info("Sending SMS to %s", message.phone_number)
-        tracking_id = self._sender.send(message)
+        try:
+            tracking_id = self._sender.send(message)
+        except SmsDelayedError as exc:
+            logger.error(
+                "Message deferred (%s); moving to delayed queue", exc
+            )
+            self._move_to_delayed(message)
+            return
+        except SmsServiceError:
+            logger.exception("Failed to send SMS to %s", message.phone_number)
+            return
+        except Exception:  # noqa: BLE001 - never kill a send worker
+            logger.exception("Unexpected error while sending SMS to %s", message.phone_number)
+            return
 
-        if not self._delivered(tracking_id):
+        if tracking_id and self._status_checker is not None:
+            self._to_check.put(_PendingStatus(message=message, tracking_id=tracking_id))
+        else:
+            logger.info(
+                "No status tracking for SMS to %s; acknowledging immediately",
+                message.phone_number,
+            )
+            self._acknowledge(message)
+
+    def _move_to_delayed(self, message: SmsMessage) -> None:
+        if self._delayed_publisher is None:
+            logger.error(
+                "No delayed publisher configured; deferred SMS to %s is dropped",
+                message.phone_number,
+            )
+            return
+        try:
+            self._delayed_publisher.publish(message)
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "Failed to move deferred SMS to delayed queue; dropping it"
+            )
+
+    # ── status workers ─────────────────────────────────────────────────
+
+    def _status_loop(self) -> None:
+        while True:
+            item = self._to_check.get()
+            if item is _SENTINEL:
+                return
+            self._handle_status(item)
+
+    def _handle_status(self, pending: _PendingStatus) -> None:
+        message = pending.message
+        if self._delivered(pending.tracking_id):
+            self._acknowledge(message)
+        else:
             logger.warning(
                 "SMS to %s not confirmed as delivered; not acknowledging "
                 "appointment %s",
                 message.phone_number,
                 message.appointment_id,
             )
-            return
 
-        self._acknowledge(message)
-
-    def _delivered(self, tracking_id: str | None) -> bool:
-        if tracking_id is None or self._status_checker is None:
-            return True
+    def _delivered(self, tracking_id: str) -> bool:
         try:
             return self._status_checker.wait_for_delivery(
                 tracking_id,
                 timeout=self._status_timeout,
                 poll_interval=self._status_poll_interval,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.exception("Delivery status check failed for %s", tracking_id)
             return False
 
     def _acknowledge(self, message: SmsMessage) -> None:
         if message.appointment_id is None or self._notified_publisher is None:
             return
-        self._notified_publisher.publish(message.appointment_id, message.offset_days)
+        try:
+            self._notified_publisher.publish(
+                message.appointment_id, message.offset_days
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "Failed to publish notified for appointment %s",
+                message.appointment_id,
+            )

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from app.config import Settings
 from app.services import dispatcher as dispatcher_module
 from app.services.authenticator import KeeneticAuthenticator
+from app.services.delayed_publisher import RabbitMqDelayedPublisher
 from app.services.dispatcher import SmsDispatchService
 from app.services.notified_publisher import RabbitMqNotifiedPublisher
 from app.services.rabbitmq_consumer import RabbitMqConsumer
@@ -114,7 +115,6 @@ def main() -> int:
         routing_key=settings.rabbitmq_routing_key,
         heartbeat=settings.rabbitmq_heartbeat,
         reconnect_delay=settings.rabbitmq_reconnect_delay,
-        delayed_queue=settings.sms_delayed_queue,
     )
     notified_publisher = RabbitMqNotifiedPublisher(
         host=settings.rabbitmq_host,
@@ -125,6 +125,15 @@ def main() -> int:
         queue_name=settings.notified_queue,
         exchange=settings.notified_exchange,
         routing_key=settings.notified_routing_key,
+        heartbeat=settings.rabbitmq_heartbeat,
+    )
+    delayed_publisher = RabbitMqDelayedPublisher(
+        host=settings.rabbitmq_host,
+        port=settings.rabbitmq_port,
+        user=settings.rabbitmq_user,
+        password=settings.rabbitmq_password,
+        vhost=settings.rabbitmq_vhost,
+        queue_name=settings.sms_delayed_queue,
         heartbeat=settings.rabbitmq_heartbeat,
     )
 
@@ -162,6 +171,7 @@ def main() -> int:
         sender=sender,
         notified_publisher=notified_publisher,
         status_checker=status_checker,
+        delayed_publisher=delayed_publisher,
         status_timeout=(
             sender_config.status_timeout
             if status_checker
@@ -172,6 +182,9 @@ def main() -> int:
             if status_checker
             else dispatcher_module.STATUS_POLL_INTERVAL
         ),
+        drain_interval=settings.sms_drain_interval,
+        send_workers=settings.sms_send_workers,
+        status_workers=settings.sms_status_workers,
     ).run()
     return 0
 

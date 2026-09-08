@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Callable
 
 from app.domain.models import SmsMessage
 
@@ -35,11 +34,15 @@ class SmsStatusChecker(ABC):
 
 
 class MessageConsumer(ABC):
-    """Continuously fetches incoming messages from a queue/broker."""
+    """Pulls messages from a queue/broker."""
 
     @abstractmethod
-    def consume(self, handler: Callable[[SmsMessage], None]) -> None:
-        """Block forever, calling handler for every incoming message."""
+    def drain(self, max_messages: int | None = None) -> list[SmsMessage]:
+        """Extract (ack) all currently available messages and return them.
+
+        The queue is drained in one pass: every returned message has already
+        been acknowledged and removed from the broker queue.
+        """
 
 
 class NotifiedPublisher(ABC):
@@ -48,3 +51,11 @@ class NotifiedPublisher(ABC):
     @abstractmethod
     def publish(self, appointment_id: int, offset_days: int | None = None) -> None:
         """Publish the appointment id to the notified feedback queue."""
+
+
+class DelayedPublisher(ABC):
+    """Moves a message to a delayed/retry queue."""
+
+    @abstractmethod
+    def publish(self, message: SmsMessage) -> None:
+        """Publish the message to the delayed queue for later retry."""
