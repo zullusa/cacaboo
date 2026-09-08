@@ -9,6 +9,7 @@ from app.services.delayed_publisher import RabbitMqDelayedPublisher
 from app.services.dispatcher import SmsDispatchService
 from app.services.notified_publisher import RabbitMqNotifiedPublisher
 from app.services.operator_lookup import OperatorLookup
+from app.services.operator_store import SqliteOperatorStore
 from app.services.rabbitmq_consumer import RabbitMqConsumer
 from app.services.routing_sender import RoutingSmsSender
 from app.services.sms_aero import SmsAeroSmsSender
@@ -86,9 +87,9 @@ def _build_smsru(settings: Settings) -> SenderConfig:
 def _build_routing(settings: Settings) -> SenderConfig:
     """SMS_PROVIDER=routing: Megafon via Keenetic modem, everyone else via sms.ru.
 
-    The operator is resolved per number through the BDPN lookup (nic-t.ru)
-    and the matching sender is used. sms.ru is the default (and provides the
-    delivery-tracking id, since modem reports are unavailable).
+    The operator is resolved per number through the MNO lookup (kody.su
+    check-tel) and the matching sender is used. sms.ru is the default (and
+    provides the delivery-tracking id, since modem reports are unavailable).
     """
     if not settings.sms_gate_api_key:
         raise RuntimeError(
@@ -97,9 +98,12 @@ def _build_routing(settings: Settings) -> SenderConfig:
         )
     keenetic_cfg = _build_keenetic(settings)
     smsru_cfg = _build_smsru(settings)
+    store = SqliteOperatorStore(settings.sms_operator_db_path)
     lookup = OperatorLookup(
         url=settings.sms_mno_lookup_url,
         timeout=settings.sms_mno_lookup_timeout,
+        store=store,
+        cache_ttl=settings.sms_operator_ttl_days * 24 * 3600,
     )
     sender = RoutingSmsSender(
         operator_lookup=lookup,

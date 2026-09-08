@@ -42,6 +42,8 @@ class Settings:
     sms_ignore_keywords: str
     sms_mno_lookup_url: str
     sms_mno_lookup_timeout: float
+    sms_operator_db_path: str
+    sms_operator_ttl_days: int
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -91,7 +93,11 @@ class Settings:
             ),
             sms_mno_lookup_url=environ.get(
                 "SMS_MNO_LOOKUP_URL",
-                "https://www.nic-t.ru/bdpn/bdpn-proverka-nomera/",
+                "https://www.kody.su/check-tel",
             ),
             sms_mno_lookup_timeout=float(environ.get("SMS_MNO_LOOKUP_TIMEOUT", "15")),
+            sms_operator_db_path=environ.get(
+                "SMS_OPERATOR_DB_PATH", "/app/data/operators.db"
+            ),
+            sms_operator_ttl_days=int(environ.get("SMS_OPERATOR_TTL_DAYS", "7")),
         )
