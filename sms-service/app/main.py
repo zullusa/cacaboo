@@ -85,7 +85,8 @@ def _build_smsru(settings: Settings) -> SenderConfig:
 
 
 def _build_routing(settings: Settings) -> SenderConfig:
-    """SMS_PROVIDER=routing: Megafon via Keenetic modem, everyone else via sms.ru.
+    """SMS_PROVIDER=routing: Megafon and Yota via Keenetic modem, everyone else
+    via sms.ru.
 
     The operator is resolved per number through the MNO lookup (kody.su
     check-tel) and the matching sender is used. sms.ru is the default (and
@@ -107,7 +108,11 @@ def _build_routing(settings: Settings) -> SenderConfig:
     )
     sender = RoutingSmsSender(
         operator_lookup=lookup,
-        operator_sender_map={"мегафон": keenetic_cfg.sender},
+        operator_sender_map={
+            "мегафон": keenetic_cfg.sender,
+            "йота": keenetic_cfg.sender,
+            "yota": keenetic_cfg.sender,
+        },
         default_sender=smsru_cfg.sender,
     )
     return SenderConfig(
@@ -221,6 +226,7 @@ def main() -> int:
             if status_checker
             else dispatcher_module.STATUS_POLL_INTERVAL
         ),
+        status_max_retries=settings.sms_status_max_retries,
         drain_interval=settings.sms_drain_interval,
         send_workers=settings.sms_send_workers,
         status_workers=settings.sms_status_workers,

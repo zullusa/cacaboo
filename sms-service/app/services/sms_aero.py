@@ -11,7 +11,7 @@ import requests
 
 from app.domain.models import SmsMessage
 from app.errors import SmsSendError, SmsStatusError
-from app.interfaces.protocols import SmsSender, SmsStatusChecker
+from app.interfaces.protocols import DeliveryStatus, SmsSender, SmsStatusChecker
 
 logger = logging.getLogger(__name__)
 
@@ -79,23 +79,23 @@ class SmsAeroSmsSender(SmsSender, SmsStatusChecker):
         tracking_id: str,
         timeout: float,
         poll_interval: float,
-    ) -> bool:
+    ) -> DeliveryStatus:
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             status_id = self._fetch_status(tracking_id)
 
             if status_id == _STATUS_DELIVERED:
                 logger.info("SMS %s delivered", tracking_id)
-                return True
+                return DeliveryStatus(delivered=True)
 
             if status_id in _STATUS_FAILED:
                 logger.warning("SMS %s failed (status_id=%s)", tracking_id, status_id)
-                return False
+                return DeliveryStatus(delivered=False)
 
             time.sleep(poll_interval)
 
         logger.warning("SMS %s status check timed out", tracking_id)
-        return False
+        return DeliveryStatus(delivered=False, timed_out=True)
 
     def _fetch_status(self, tracking_id: str) -> int:
         try:

@@ -3,7 +3,7 @@
 import logging
 
 from app.domain.models import SmsMessage
-from app.interfaces.protocols import SmsSender, SmsStatusChecker
+from app.interfaces.protocols import DeliveryStatus, SmsSender, SmsStatusChecker
 from app.services.operator_lookup import OperatorLookup, OperatorLookupError
 
 logger = logging.getLogger(__name__)
@@ -44,10 +44,10 @@ class RoutingSmsSender(SmsSender, SmsStatusChecker):
         tracking_id: str,
         timeout: float,
         poll_interval: float,
-    ) -> bool:
+    ) -> DeliveryStatus:
         checker = getattr(self._default_sender, "wait_for_delivery", None)
         if checker is None:
-            return False
+            return DeliveryStatus(delivered=False)
         return checker(tracking_id, timeout, poll_interval)
 
     # ── internals ──────────────────────────────────────────────────────

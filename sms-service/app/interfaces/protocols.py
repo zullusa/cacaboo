@@ -1,6 +1,15 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 from app.domain.models import SmsMessage
+
+
+@dataclass(frozen=True)
+class DeliveryStatus:
+    """Outcome of a single delivery-status wait window."""
+
+    delivered: bool
+    timed_out: bool = False
 
 
 class SmsSender(ABC):
@@ -25,11 +34,14 @@ class SmsStatusChecker(ABC):
         tracking_id: str,
         timeout: float,
         poll_interval: float,
-    ) -> bool:
-        """Block until a terminal status is reached.
+    ) -> DeliveryStatus:
+        """Block until a terminal status is reached (or timeout).
 
-        Returns True if the SMS was successfully delivered, False otherwise
-        (failed/expired/timeout).
+        Returns ``DeliveryStatus(delivered=True)`` on confirmed delivery,
+        ``DeliveryStatus(delivered=False)`` on a terminal failure, or
+        ``DeliveryStatus(delivered=False, timed_out=True)`` when the timeout
+        elapsed before a terminal status arrived (status still unknown — the
+        caller may retry).
         """
 
 

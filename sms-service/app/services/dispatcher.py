@@ -8,6 +8,7 @@ from app.domain.models import SmsMessage
 from app.errors import SmsDelayedError, SmsServiceError
 from app.interfaces.protocols import (
     DelayedPublisher,
+    DeliveryStatus,
     MessageConsumer,
     NotifiedPublisher,
     SmsSender,
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 STATUS_TIMEOUT = float(120)
 STATUS_POLL_INTERVAL = float(10)
+STATUS_MAX_RETRIES = 3
 DRAIN_INTERVAL = float(1.0)
 
 _SENTINEL = object()
@@ -55,6 +57,7 @@ class SmsDispatchService:
         delayed_publisher: DelayedPublisher | None = None,
         status_timeout: float = STATUS_TIMEOUT,
         status_poll_interval: float = STATUS_POLL_INTERVAL,
+        status_max_retries: int = STATUS_MAX_RETRIES,
         drain_interval: float = DRAIN_INTERVAL,
         send_workers: int = 4,
         status_workers: int = 4,
@@ -66,6 +69,7 @@ class SmsDispatchService:
         self._delayed_publisher = delayed_publisher
         self._status_timeout = status_timeout
         self._status_poll_interval = status_poll_interval
+        self._status_max_retries = max(0, status_max_retries)
         self._drain_interval = drain_interval
         self._send_workers = max(1, send_workers)
         self._status_workers = max(1, status_workers)
@@ -185,17 +189,43 @@ class SmsDispatchService:
 
     def _handle_status(self, pending: _PendingStatus) -> None:
         message = pending.message
-        if self._delivered(pending.tracking_id):
+        status = self._await_delivery(pending.tracking_id)
+        if status.delivered:
             self._acknowledge(message)
         else:
             logger.warning(
-                "SMS to %s not confirmed as delivered; not acknowledging "
-                "appointment %s",
+                "SMS to %s not confirmed as delivered (timed_out=%s); "
+                "not acknowledging appointment %s",
                 message.phone_number,
+                status.timed_out,
                 message.appointment_id,
             )
 
-    def _delivered(self, tracking_id: str) -> bool:
+    def _await_delivery(self, tracking_id: str) -> DeliveryStatus:
+        """Wait for delivery, retrying when the wait window simply times out.
+
+        A timeout means the status is still unknown (the SMS may still be in
+        transit), so the check is retried up to ``status_max_retries`` times.
+        A terminal failure is never retried.
+        """
+        attempts = self._status_max_retries + 1
+        for attempt in range(1, attempts + 1):
+            status = self._delivered(tracking_id)
+            if status.delivered or not status.timed_out:
+                return status
+            if attempt < attempts:
+                logger.warning(
+                    "Status wait for %s timed out (attempt %d/%d); retrying",
+                    tracking_id,
+                    attempt,
+                    attempts,
+                )
+        logger.warning(
+            "Status wait for %s timed out after %d attempt(s)", tracking_id, attempts
+        )
+        return status
+
+    def _delivered(self, tracking_id: str) -> DeliveryStatus:
         try:
             return self._status_checker.wait_for_delivery(
                 tracking_id,
@@ -204,7 +234,7 @@ class SmsDispatchService:
             )
         except Exception:  # noqa: BLE001
             logger.exception("Delivery status check failed for %s", tracking_id)
-            return False
+            return DeliveryStatus(delivered=False)
 
     def _acknowledge(self, message: SmsMessage) -> None:
         if message.appointment_id is None or self._notified_publisher is None:

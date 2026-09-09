@@ -16,6 +16,7 @@ class Settings:
     smsaero_channel: str
     sms_gate_status_timeout: int
     sms_gate_status_poll_interval: int
+    sms_status_max_retries: int
     sms_gate_from: str
     rabbitmq_host: str
     rabbitmq_port: int
@@ -61,6 +62,7 @@ class Settings:
             sms_gate_status_poll_interval=int(
                 environ.get("SMS_GATE_STATUS_POLL_INTERVAL", "10")
             ),
+            sms_status_max_retries=int(environ.get("SMS_STATUS_MAX_RETRIES", "3")),
             sms_gate_from=environ.get("SMS_GATE_FROM", ""),
             rabbitmq_host=environ.get("RABBITMQ_HOST", "rabbitmq"),
             rabbitmq_port=int(environ.get("RABBITMQ_PORT", "5672")),
