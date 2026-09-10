@@ -152,7 +152,7 @@ groups:
               to: 0
             model:
               expr: |
-                100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+                100 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100
               instant: false
               range: true
           - refId: C
@@ -172,7 +172,7 @@ groups:
           severity: warning
         annotations:
           summary: "CPU usage above 85%"
-          description: "Current CPU usage: {{ $values.A | humanizePercentage }}"
+          description: "Average host CPU usage has been above 85% for at least 10 minutes."
 
       - uid: high-memory
         title: "High memory usage"
@@ -205,7 +205,7 @@ groups:
           severity: warning
         annotations:
           summary: "Memory usage above 85%"
-          description: "Current memory usage: {{ $values.A | humanizePercentage }}"
+          description: "Host memory usage has been above 85% for at least 10 minutes."
 
       - uid: disk-low
         title: "Disk space low"
@@ -239,7 +239,7 @@ groups:
           severity: warning
         annotations:
           summary: "Disk usage above 85%"
-          description: "Mountpoint {{ $labels.mountpoint }}: {{ $values.A | humanizePercentage }} used."
+          description: "Filesystem {{ $labels.mountpoint }} is more than 85% full."
 
   - orgId: 1
     name: mysql

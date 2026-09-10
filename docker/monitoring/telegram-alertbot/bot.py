@@ -74,7 +74,7 @@ def _send_telegram(text: str) -> None:
     req = Request(TELEGRAM_API, data=body, headers={"Content-Type": "application/json"})
 
     try:
-        with urlopen(req, timeout=15) as resp:
+        with urlopen(req, timeout=8) as resp:
             if resp.status != 200:
                 logger.error("Telegram API returned %d", resp.status)
     except URLError as exc:

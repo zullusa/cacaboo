@@ -242,7 +242,7 @@ services:
       - '-promscrape.config=/etc/victoriametrics/prometheus.yml'
       - '-retentionPeriod=${VM_RETENTION_PERIOD:-30d}'
       - '-storageDataPath=/victoria-metrics-data'
-      - '-search.queryTimeout=30s'
+      - '-search.maxQueryDuration=30s'
     volumes:
       - './docker/monitoring/victoriametrics/prometheus.yml:/etc/victoriametrics/prometheus.yml:ro'
       - 'victoriametrics-data:/victoria-metrics-data'
@@ -325,7 +325,23 @@ services:
     container_name: mysqld-exporter
     restart: unless-stopped
     environment:
-      - DATA_SOURCE_NAME=${MYSQL_USER}:${MYSQL_PASSWORD}@tcp(mysql:3306)/
+      - MYSQL_EXPORTER_HOST=mysql
+      - MYSQL_EXPORTER_PORT=3306
+      - MYSQL_EXPORTER_USER=${MYSQL_USER}
+      - MYSQL_EXPORTER_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQLD_EXPORTER_PASSWORD=${MYSQL_PASSWORD}
+    entrypoint:
+      - /bin/sh
+      - '-ec'
+      - |
+        cat > /tmp/my.cnf <<EOF
+        [client]
+        host = $$MYSQL_EXPORTER_HOST
+        port = $$MYSQL_EXPORTER_PORT
+        user = $$MYSQL_EXPORTER_USER
+        password = $$MYSQL_EXPORTER_PASSWORD
+        EOF
+        exec mysqld_exporter --config.my-cnf=/tmp/my.cnf
     ports:
       - '${MYSQL_EXPORTER_PORT:-9104}:9104'
     depends_on:
@@ -420,7 +436,7 @@ services:
       - '--es.uri=http://opensearch:9200'
       - '--es.timeout=10s'
     ports:
-      - '${OPENSEARCH_EXPORTER_PORT:-9115}:9115'
+      - '${OPENSEARCH_EXPORTER_PORT:-9114}:9114'
     depends_on:
       - opensearch
     networks:
