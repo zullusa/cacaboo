@@ -12,15 +12,23 @@ groups:
         data:
           - refId: A
             datasourceUid: victoriametrics
+            relativeTimeRange:
+              from: 600
+              to: 0
             model:
               expr: |
                 sms_status_exhausted_total
                 - sms_status_exhausted_total offset 5m
               instant: false
+              range: true
           - refId: C
             datasourceUid: __expr__
+            relativeTimeRange:
+              from: 600
+              to: 0
             model:
               type: threshold
+              expression: A
               conditions:
                 - evaluator:
                     type: gt
@@ -30,7 +38,7 @@ groups:
           severity: critical
         annotations:
           summary: "SMS delivery status unknown after all retries"
-          description: "{{ $values.A }} SMS message(s) exhausted all status retries without a delivery confirmation in the last 5 minutes."
+          description: "SMS message(s) exhausted all status retries without a delivery confirmation in the last 5 minutes."
 
       - uid: sms-failure-rate
         title: "SMS delivery failure rate high"
@@ -38,14 +46,23 @@ groups:
         data:
           - refId: A
             datasourceUid: victoriametrics
+            relativeTimeRange:
+              from: 600
+              to: 0
             model:
               expr: |
                 rate(sms_sent_total{status="failed"}[5m])
                 / rate(sms_sent_total[5m])
+              instant: false
+              range: true
           - refId: C
             datasourceUid: __expr__
+            relativeTimeRange:
+              from: 600
+              to: 0
             model:
               type: threshold
+              expression: A
               conditions:
                 - evaluator:
                     type: gt
@@ -54,7 +71,7 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "SMS failure rate: {{ $values.A | humanizePercentage }}"
+          summary: "SMS failure rate above 10%"
 
       - uid: sms-queue-backlog
         title: "SMS send queue backlog"
@@ -62,12 +79,21 @@ groups:
         data:
           - refId: A
             datasourceUid: victoriametrics
+            relativeTimeRange:
+              from: 600
+              to: 0
             model:
               expr: sms_send_queue_size
+              instant: false
+              range: true
           - refId: C
             datasourceUid: __expr__
+            relativeTimeRange:
+              from: 600
+              to: 0
             model:
               type: threshold
+              expression: A
               conditions:
                 - evaluator:
                     type: gt
@@ -76,7 +102,7 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "SMS queue has {{ $values.A }} pending messages"
+          summary: "SMS queue has more than 50 pending messages"
 
   - orgId: 1
     name: infrastructure
@@ -89,12 +115,21 @@ groups:
         data:
           - refId: A
             datasourceUid: victoriametrics
+            relativeTimeRange:
+              from: 600
+              to: 0
             model:
               expr: up == 0
+              instant: true
+              range: false
           - refId: C
             datasourceUid: __expr__
+            relativeTimeRange:
+              from: 600
+              to: 0
             model:
               type: threshold
+              expression: A
               conditions:
                 - evaluator:
                     type: gt
@@ -103,8 +138,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "{{ $labels.job }} is down"
-          description: "{{ $labels.instance }} unreachable for >1min."
+          summary: "A monitored service is down"
+          description: "{{ $labels.job }} / {{ $labels.instance }} is unreachable for more than 1 minute."
 
       - uid: high-cpu
         title: "High CPU usage"
@@ -112,13 +147,22 @@ groups:
         data:
           - refId: A
             datasourceUid: victoriametrics
+            relativeTimeRange:
+              from: 600
+              to: 0
             model:
               expr: |
                 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+              instant: false
+              range: true
           - refId: C
             datasourceUid: __expr__
+            relativeTimeRange:
+              from: 600
+              to: 0
             model:
               type: threshold
+              expression: A
               conditions:
                 - evaluator:
                     type: gt
@@ -128,6 +172,7 @@ groups:
           severity: warning
         annotations:
           summary: "CPU usage above 85%"
+          description: "Current CPU usage: {{ $values.A | humanizePercentage }}"
 
       - uid: high-memory
         title: "High memory usage"
@@ -135,13 +180,22 @@ groups:
         data:
           - refId: A
             datasourceUid: victoriametrics
+            relativeTimeRange:
+              from: 600
+              to: 0
             model:
               expr: |
                 (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100
+              instant: false
+              range: true
           - refId: C
             datasourceUid: __expr__
+            relativeTimeRange:
+              from: 600
+              to: 0
             model:
               type: threshold
+              expression: A
               conditions:
                 - evaluator:
                     type: gt
@@ -151,6 +205,7 @@ groups:
           severity: warning
         annotations:
           summary: "Memory usage above 85%"
+          description: "Current memory usage: {{ $values.A | humanizePercentage }}"
 
       - uid: disk-low
         title: "Disk space low"
@@ -158,14 +213,23 @@ groups:
         data:
           - refId: A
             datasourceUid: victoriametrics
+            relativeTimeRange:
+              from: 600
+              to: 0
             model:
               expr: |
                 (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}
                      / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) * 100
+              instant: false
+              range: true
           - refId: C
             datasourceUid: __expr__
+            relativeTimeRange:
+              from: 600
+              to: 0
             model:
               type: threshold
+              expression: A
               conditions:
                 - evaluator:
                     type: gt
@@ -174,7 +238,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Disk usage above 85% on {{ $labels.mountpoint }}"
+          summary: "Disk usage above 85%"
+          description: "Mountpoint {{ $labels.mountpoint }}: {{ $values.A | humanizePercentage }} used."
 
   - orgId: 1
     name: mysql
@@ -187,12 +252,21 @@ groups:
         data:
           - refId: A
             datasourceUid: victoriametrics
+            relativeTimeRange:
+              from: 600
+              to: 0
             model:
               expr: mysql_up == 0
+              instant: true
+              range: false
           - refId: C
             datasourceUid: __expr__
+            relativeTimeRange:
+              from: 600
+              to: 0
             model:
               type: threshold
+              expression: A
               conditions:
                 - evaluator:
                     type: gt
@@ -209,14 +283,23 @@ groups:
         data:
           - refId: A
             datasourceUid: victoriametrics
+            relativeTimeRange:
+              from: 600
+              to: 0
             model:
               expr: |
                 mysql_global_status_threads_connected
                 / mysql_global_variables_max_connections
+              instant: false
+              range: true
           - refId: C
             datasourceUid: __expr__
+            relativeTimeRange:
+              from: 600
+              to: 0
             model:
               type: threshold
+              expression: A
               conditions:
                 - evaluator:
                     type: gt
