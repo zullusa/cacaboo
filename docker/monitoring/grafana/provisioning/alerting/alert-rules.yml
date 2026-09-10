@@ -1,0 +1,228 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: sms-alerts
+    folder: SMS
+    interval: 1m
+    rules:
+      - uid: sms-status-not-updated
+        title: "SMS status not updated after retries"
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: victoriametrics
+            model:
+              expr: |
+                sms_status_exhausted_total
+                - sms_status_exhausted_total offset 5m
+              instant: false
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SMS delivery status unknown after all retries"
+          description: "{{ $values.A }} SMS message(s) exhausted all status retries without a delivery confirmation in the last 5 minutes."
+
+      - uid: sms-failure-rate
+        title: "SMS delivery failure rate high"
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: victoriametrics
+            model:
+              expr: |
+                rate(sms_sent_total{status="failed"}[5m])
+                / rate(sms_sent_total[5m])
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.1]
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SMS failure rate: {{ $values.A | humanizePercentage }}"
+
+      - uid: sms-queue-backlog
+        title: "SMS send queue backlog"
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: victoriametrics
+            model:
+              expr: sms_send_queue_size
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [50]
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SMS queue has {{ $values.A }} pending messages"
+
+  - orgId: 1
+    name: infrastructure
+    folder: Infrastructure
+    interval: 1m
+    rules:
+      - uid: service-down
+        title: "Service down"
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: victoriametrics
+            model:
+              expr: up == 0
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} is down"
+          description: "{{ $labels.instance }} unreachable for >1min."
+
+      - uid: high-cpu
+        title: "High CPU usage"
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: victoriametrics
+            model:
+              expr: |
+                100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [85]
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU usage above 85%"
+
+      - uid: high-memory
+        title: "High memory usage"
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: victoriametrics
+            model:
+              expr: |
+                (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [85]
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Memory usage above 85%"
+
+      - uid: disk-low
+        title: "Disk space low"
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: victoriametrics
+            model:
+              expr: |
+                (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}
+                     / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) * 100
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [85]
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk usage above 85% on {{ $labels.mountpoint }}"
+
+  - orgId: 1
+    name: mysql
+    folder: MySQL
+    interval: 1m
+    rules:
+      - uid: mysql-down
+        title: "MySQL is down"
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: victoriametrics
+            model:
+              expr: mysql_up == 0
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MySQL is unreachable"
+
+      - uid: mysql-high-connections
+        title: "MySQL connections near limit"
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: victoriametrics
+            model:
+              expr: |
+                mysql_global_status_threads_connected
+                / mysql_global_variables_max_connections
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.8]
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MySQL connections above 80% of max"

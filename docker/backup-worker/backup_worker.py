@@ -25,7 +25,22 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from worker_metrics import Counter, metrics_server
+
 logger = logging.getLogger("backup-worker")
+
+backup_runs_total = Counter(
+    "backup_runs_total", "Database backup runs executed"
+)
+backup_success_total = Counter(
+    "backup_success_total", "Backups uploaded to the share successfully"
+)
+backup_failures_total = Counter(
+    "backup_failures_total", "Backup attempts that failed"
+)
+backup_duration_seconds = Counter(
+    "backup_duration_seconds", "Seconds spent on the last backup run"
+)
 
 
 def env(name: str, default: str = "") -> str:
@@ -120,21 +135,27 @@ class BackupWorker:
             logger.error(
                 "SMB share is not configured (SMB_HOST, SMB_SHARE, SMB_USERNAME), skipping the backup",
             )
+            backup_failures_total.inc()
             return
 
         self.local_dir.mkdir(parents=True, exist_ok=True)
 
         dump_path = self.local_dir / f"{self.prefix}_{now:%Y-%m-%d}_{now:%H%M%S}.sql"
         archive_path = dump_path.with_suffix(".sql.gz")
+        backup_runs_total.inc()
+        started_at = time.monotonic()
 
         try:
             self.dump_database(dump_path)
             self.compress(dump_path, archive_path)
             self.upload(archive_path)
             self.prune_remote(now.date())
+            backup_success_total.inc()
+            backup_duration_seconds.inc(time.monotonic() - started_at)
             logger.info("Backup uploaded: %s", archive_path.name)
         except Exception:
             logger.exception("Backup failed")
+            backup_failures_total.inc()
         finally:
             for path in (dump_path, archive_path):
                 if path.exists():
@@ -247,6 +268,18 @@ def main() -> None:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    metrics_server(
+        {
+            counter.name: counter
+            for counter in (
+                backup_runs_total,
+                backup_success_total,
+                backup_failures_total,
+                backup_duration_seconds,
+            )
+        },
+        port=int(env("METRICS_PORT", "8003")),
     )
     BackupWorker().run()
 

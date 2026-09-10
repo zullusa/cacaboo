@@ -14,5 +14,8 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY backup_worker.py .
+COPY worker_metrics.py .
+
+EXPOSE 8003
 
 CMD ["python", "-u", "backup_worker.py"]

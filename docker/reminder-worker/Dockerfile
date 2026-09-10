@@ -10,5 +10,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY reminder_worker.py .
+COPY worker_metrics.py .
+
+EXPOSE 8002
 
 CMD ["python", "-u", "reminder_worker.py"]

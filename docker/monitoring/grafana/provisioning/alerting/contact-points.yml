@@ -1,0 +1,22 @@
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: telegram
+    receivers:
+      - uid: telegram-bot
+        type: webhook
+        settings:
+          url: "http://telegram-alertbot:8080/alert"
+          httpMethod: POST
+        disableResolveMessage: false
+
+  - orgId: 1
+    name: logging
+    receivers:
+      - uid: log-receiver
+        type: webhook
+        settings:
+          url: "http://opensearch:9200/_bulk"
+          httpMethod: POST
+        disableResolveMessage: true

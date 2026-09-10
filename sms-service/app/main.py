@@ -3,6 +3,7 @@ import sys
 from dataclasses import dataclass
 
 from app.config import Settings
+from app.metrics import start_metrics_server, sms_service_info
 from app.services import dispatcher as dispatcher_module
 from app.services.authenticator import KeeneticAuthenticator
 from app.services.delayed_publisher import RabbitMqDelayedPublisher
@@ -145,6 +146,12 @@ def main() -> int:
     )
     settings = build_settings()
 
+    start_metrics_server(port=8001)
+    sms_service_info.info({
+        "provider": settings.sms_provider,
+        "version": "1.0.0",
+    })
+
     sender_config = _build_sender(settings)
     sender = sender_config.sender
     status_checker = sender_config.status_checker
@@ -230,6 +237,7 @@ def main() -> int:
         drain_interval=settings.sms_drain_interval,
         send_workers=settings.sms_send_workers,
         status_workers=settings.sms_status_workers,
+        provider=settings.sms_provider,
     ).run()
     return 0
 

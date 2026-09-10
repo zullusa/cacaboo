@@ -27,7 +27,29 @@ from zoneinfo import ZoneInfo
 import pika
 import pymysql
 
+from worker_metrics import Counter, metrics_server
+
 logger = logging.getLogger("reminder-worker")
+
+# Prometheus-style counters exposed on :8002/metrics
+reminders_cycles_total = Counter(
+    "reminder_cycles_total", "Number of reminder poll cycles executed"
+)
+reminders_cycles_errors_total = Counter(
+    "reminder_cycles_errors_total", "Reminder poll cycles that raised an exception"
+)
+reminders_published_total = Counter(
+    "reminders_published_total", "Reminder messages published to RabbitMQ"
+)
+reminders_skipped_total = Counter(
+    "reminders_skipped_total",
+    "Reminders skipped before publishing",
+    labels=("reason",),
+)
+reminders_notified_total = Counter(
+    "reminders_notified_total",
+    "Appointments marked as notified from the feedback queue",
+)
 
 
 
@@ -195,8 +217,10 @@ class ReminderWorker:
 
             try:
                 self.process_cycle()
+                reminders_cycles_total.inc()
             except Exception:
                 logger.exception("Reminder cycle failed")
+                reminders_cycles_errors_total.inc()
 
             elapsed = time.monotonic() - started_at
             time.sleep(max(1, self.poll_interval - elapsed))
@@ -284,6 +308,7 @@ class ReminderWorker:
                     "Skipping appointment %s: no recipient phone number",
                     appointment_id,
                 )
+                reminders_skipped_total.inc(label_values=("no_phone",))
                 continue
 
             if self.already_sent(cursor, appointment_id, days):
@@ -292,6 +317,7 @@ class ReminderWorker:
                     appointment_id,
                     days,
                 )
+                reminders_skipped_total.inc(label_values=("already_sent",))
                 continue
 
             raw_phone = (appointment["phone"] or "").strip()
@@ -302,6 +328,7 @@ class ReminderWorker:
                     appointment_id,
                     raw_phone,
                 )
+                reminders_skipped_total.inc(label_values=("invalid_phone",))
                 self.notify_telegram(appointment, raw_phone)
                 self.mark_error(cursor, appointment_id)
                 self.mark_sent(cursor, appointment_id, days)
@@ -322,6 +349,7 @@ class ReminderWorker:
                 continue
 
             self.mark_sent(cursor, appointment_id, days)
+            reminders_published_total.inc()
 
             logger.info(
                 "Published reminder for appointment %s (%s day(s) ahead)",
@@ -646,6 +674,7 @@ class NotifiedStatusUpdater:
                     f"UPDATE {self.table_prefix}appointments SET status = %s WHERE id = %s",
                     (self.status, appointment_id),
                 )
+            reminders_notified_total.inc()
         finally:
             connection.close()
 
@@ -654,6 +683,20 @@ def main() -> None:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s - %(message)s",
+    )
+
+    metrics_server(
+        {
+            counter.name: counter
+            for counter in (
+                reminders_cycles_total,
+                reminders_cycles_errors_total,
+                reminders_published_total,
+                reminders_skipped_total,
+                reminders_notified_total,
+            )
+        },
+        port=int(env("METRICS_PORT", "8002")),
     )
 
     try:

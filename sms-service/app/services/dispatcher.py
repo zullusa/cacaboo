@@ -14,6 +14,19 @@ from app.interfaces.protocols import (
     SmsSender,
     SmsStatusChecker,
 )
+from app.metrics import (
+    sms_acknowledged_total,
+    sms_delayed_total,
+    sms_drain_errors_total,
+    sms_drained_total,
+    sms_delivery_wait_seconds,
+    sms_send_duration_seconds,
+    sms_send_queue_size,
+    sms_sent_total,
+    sms_status_checks_total,
+    sms_status_exhausted_total,
+    sms_status_retries_total,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +74,7 @@ class SmsDispatchService:
         drain_interval: float = DRAIN_INTERVAL,
         send_workers: int = 4,
         status_workers: int = 4,
+        provider: str = "unknown",
     ) -> None:
         self._consumer = consumer
         self._sender = sender
@@ -73,6 +87,7 @@ class SmsDispatchService:
         self._drain_interval = drain_interval
         self._send_workers = max(1, send_workers)
         self._status_workers = max(1, status_workers)
+        self._provider = provider
 
         self._to_send: queue.Queue = queue.Queue()
         self._to_check: queue.Queue = queue.Queue()
@@ -109,12 +124,13 @@ class SmsDispatchService:
             try:
                 messages = self._consumer.drain()
             except SmsDelayedError:
-                # Not expected here; just log and keep going.
                 logger.exception("Unexpected SmsDelayedError during drain")
+                sms_drain_errors_total.inc()
                 self._sleep_or_stop()
                 continue
             except Exception:  # noqa: BLE001 - keep the drain loop alive
                 logger.exception("Drain failed; retrying in %.0fs", self._drain_interval)
+                sms_drain_errors_total.inc()
                 self._sleep_or_stop()
                 continue
 
@@ -123,6 +139,8 @@ class SmsDispatchService:
                 continue
 
             logger.info("Extracted %d message(s) from the queue", len(messages))
+            sms_drained_total.inc(len(messages))
+            sms_send_queue_size.inc(len(messages))
             for message in messages:
                 self._to_send.put(message)
 
@@ -140,20 +158,29 @@ class SmsDispatchService:
 
     def _handle_send(self, message: SmsMessage) -> None:
         logger.info("Sending SMS to %s", message.phone_number)
+        sms_send_queue_size.dec()
+        start = time.monotonic()
         try:
             tracking_id = self._sender.send(message)
         except SmsDelayedError as exc:
             logger.error(
                 "Message deferred (%s); moving to delayed queue", exc
             )
+            sms_sent_total.labels(provider=self._provider, status="delayed").inc()
             self._move_to_delayed(message)
             return
         except SmsServiceError:
             logger.exception("Failed to send SMS to %s", message.phone_number)
+            sms_sent_total.labels(provider=self._provider, status="failed").inc()
             return
         except Exception:  # noqa: BLE001 - never kill a send worker
             logger.exception("Unexpected error while sending SMS to %s", message.phone_number)
+            sms_sent_total.labels(provider=self._provider, status="error").inc()
             return
+
+        elapsed = time.monotonic() - start
+        sms_send_duration_seconds.labels(provider=self._provider).observe(elapsed)
+        sms_sent_total.labels(provider=self._provider, status="sent").inc()
 
         if tracking_id and self._status_checker is not None:
             self._to_check.put(_PendingStatus(message=message, tracking_id=tracking_id))
@@ -173,6 +200,7 @@ class SmsDispatchService:
             return
         try:
             self._delayed_publisher.publish(message)
+            sms_delayed_total.labels(provider=self._provider).inc()
         except Exception:  # noqa: BLE001
             logger.exception(
                 "Failed to move deferred SMS to delayed queue; dropping it"
@@ -191,8 +219,10 @@ class SmsDispatchService:
         message = pending.message
         status = self._await_delivery(pending.tracking_id)
         if status.delivered:
+            sms_status_checks_total.labels(provider=self._provider, result="delivered").inc()
             self._acknowledge(message)
         else:
+            sms_status_checks_total.labels(provider=self._provider, result="not_delivered").inc()
             logger.warning(
                 "SMS to %s not confirmed as delivered (timed_out=%s); "
                 "not acknowledging appointment %s",
@@ -209,17 +239,26 @@ class SmsDispatchService:
         A terminal failure is never retried.
         """
         attempts = self._status_max_retries + 1
+        start = time.monotonic()
         for attempt in range(1, attempts + 1):
             status = self._delivered(tracking_id)
             if status.delivered or not status.timed_out:
+                sms_delivery_wait_seconds.labels(provider=self._provider).observe(
+                    time.monotonic() - start
+                )
                 return status
             if attempt < attempts:
+                sms_status_retries_total.labels(provider=self._provider, status="timed_out").inc()
                 logger.warning(
                     "Status wait for %s timed out (attempt %d/%d); retrying",
                     tracking_id,
                     attempt,
                     attempts,
                 )
+        sms_delivery_wait_seconds.labels(provider=self._provider).observe(
+            time.monotonic() - start
+        )
+        sms_status_exhausted_total.labels(provider=self._provider).inc()
         logger.warning(
             "Status wait for %s timed out after %d attempt(s)", tracking_id, attempts
         )
@@ -243,6 +282,7 @@ class SmsDispatchService:
             self._notified_publisher.publish(
                 message.appointment_id, message.offset_days
             )
+            sms_acknowledged_total.labels(provider=self._provider).inc()
         except Exception:  # noqa: BLE001
             logger.exception(
                 "Failed to publish notified for appointment %s",

@@ -16,6 +16,7 @@ import urllib.request
 import requests
 from croniter import croniter
 
+from app.metrics import sms_poller_forwarded_total
 from app.services.authenticator import KeeneticAuthenticator
 
 logger = logging.getLogger(__name__)
@@ -262,6 +263,7 @@ class SmsPoller:
             )
 
             if self._send_telegram(telegram_text):
+                sms_poller_forwarded_total.inc()
                 self._delete_sms(msg_id)
             else:
                 logger.warning(

@@ -9,6 +9,7 @@ from urllib.parse import urlencode
 import requests
 
 from app.errors import SmsServiceError
+from app.metrics import sms_operator_lookup_errors_total, sms_operator_lookup_seconds
 
 logger = logging.getLogger(__name__)
 
@@ -145,6 +146,7 @@ class OperatorLookup:
         return None
 
     def _request(self, number: str) -> str | None:
+        start = time.monotonic()
         try:
             response = self._session.post(
                 self._url,
@@ -153,17 +155,20 @@ class OperatorLookup:
                 timeout=self._timeout,
             )
         except requests.RequestException as exc:
+            sms_operator_lookup_errors_total.inc()
             raise OperatorLookupError(
                 f"MNO request failed for {number}: {exc}"
             ) from exc
 
         if response.status_code != 200:
+            sms_operator_lookup_errors_total.inc()
             raise OperatorLookupError(
                 f"MNO HTTP {response.status_code} for {number}: "
                 f"{response.text[:300]}"
             )
 
         operator = self._parse(response.text)
+        sms_operator_lookup_seconds.observe(time.monotonic() - start)
         logger.info("Operator of %s -> %s", number, operator)
         return operator
 
