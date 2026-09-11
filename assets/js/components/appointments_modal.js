@@ -38,6 +38,7 @@ App.Components.AppointmentsModal = (function () {
     const $appointmentNotes = $('#appointment-notes');
     const $carMake = $('#car-make');
     const $carPlate = $('#car-plate');
+    const $carLocation = $('#car-location');
     const $appointmentAuthor = $('#appointment-author');
     const $reloadAppointments = $('#reload-appointments');
     const $selectFilterItem = $('#select-filter-item');
@@ -102,6 +103,7 @@ App.Components.AppointmentsModal = (function () {
                 notes: $appointmentNotes.val(),
                 car_make: $carMake.val(),
                 car_plate: $carPlate.val(),
+                car_location: $carLocation.val(),
                 is_unavailability: Number(false),
             };
 
@@ -516,6 +518,7 @@ App.Components.AppointmentsModal = (function () {
     function resetModal() {
         // Empty form fields.
         $appointmentsModal.find('input, textarea').val('');
+        $carLocation.val('');
         $customerId.removeData('autoSelected');
         $appointmentsModal.find('.modal-message').addClass('.d-none');
         $appointmentsModal.find('.is-invalid').removeClass('is-invalid');

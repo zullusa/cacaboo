@@ -53,6 +53,7 @@ class Calendar extends EA_Controller
         'notes',
         'car_make',
         'car_plate',
+        'car_location',
         'color',
         'status',
         'is_unavailability',
@@ -366,9 +367,13 @@ class Calendar extends EA_Controller
                 // Check if the provider has a conflicting appointment at the selected time
                 $exclude_appointment_id = !empty($appointment['id']) ? (int) $appointment['id'] : null;
 
-                // The car make and plate fields are required for every appointment.
-                if (empty($appointment['car_make']) || empty($appointment['car_plate'])) {
-                    throw new RuntimeException('The car make and car plate fields are required.');
+                // The car make, plate and location fields are required for every appointment.
+                if (
+                    empty($appointment['car_make']) ||
+                    empty($appointment['car_plate']) ||
+                    empty($appointment['car_location'])
+                ) {
+                    throw new RuntimeException('The car make, car plate and car location fields are required.');
                 }
 
                 $has_conflict = $this->appointments_model->has_provider_conflict(

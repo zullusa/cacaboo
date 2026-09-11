@@ -295,6 +295,7 @@ App.Utils.CalendarTableView = (function () {
         $appointmentsModal.find('#appointment-notes').val(appointment.notes);
         $appointmentsModal.find('#car-make').val(appointment.car_make);
         $appointmentsModal.find('#car-plate').val(appointment.car_plate);
+        $appointmentsModal.find('#car-location').val(appointment.car_location || '');
         $appointmentsModal.find('#appointment-author').val(appointment.author);
         App.Components.ColorSelection.setColor($appointmentsModal.find('#appointment-color'), appointment.color);
         $appointmentsModal.modal('show');

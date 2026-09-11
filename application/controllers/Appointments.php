@@ -32,6 +32,7 @@ class Appointments extends EA_Controller
         'notes',
         'car_make',
         'car_plate',
+        'car_location',
         'color',
         'status',
         'is_unavailability',

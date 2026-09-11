@@ -177,6 +177,18 @@
                                 </div>
 
                                 <div class="mb-3">
+                                    <label for="car-location" class="form-label">
+                                        <?= lang('car_location') ?>
+                                        <span class="text-danger">*</span>
+                                    </label>
+                                    <select id="car-location" class="required form-select" required>
+                                        <option value=""><?= lang('please_select') ?></option>
+                                        <option value="у владельца"><?= lang('car_location_owner') ?></option>
+                                        <option value="у нас"><?= lang('car_location_at_shop') ?></option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
                                     <label for="appointment-notes" class="form-label">
                                         <?= lang('notes') ?>
                                         <?php if ($require_notes): ?>

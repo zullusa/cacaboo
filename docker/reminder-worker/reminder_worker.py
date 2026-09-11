@@ -303,14 +303,6 @@ class ReminderWorker:
             appointment_id = int(appointment["id"])
             start_datetime = parse_start_datetime(appointment["start_datetime"])
 
-            if not appointment["phone"]:
-                logger.info(
-                    "Skipping appointment %s: no recipient phone number",
-                    appointment_id,
-                )
-                reminders_skipped_total.inc(label_values=("no_phone",))
-                continue
-
             if self.already_sent(cursor, appointment_id, days):
                 logger.info(
                     "Skipping appointment %s: reminder %s day(s) ahead already sent",
@@ -318,6 +310,30 @@ class ReminderWorker:
                     days,
                 )
                 reminders_skipped_total.inc(label_values=("already_sent",))
+                continue
+
+            if appointment.get("car_location") == "у нас":
+                # The car is already at the shop, no reminder must be sent. The
+                # appointment is marked as notified right away so that it no
+                # longer appears in any upcoming reminder window.
+                self.mark_notified(cursor, appointment_id)
+                self.mark_sent(cursor, appointment_id, days)
+                reminders_skipped_total.inc(label_values=("car_at_shop",))
+                logger.info(
+                    "Appointment %s is at the shop ('у нас'); marked as '%s' "
+                    "without sending a reminder (%s day(s) ahead)",
+                    appointment_id,
+                    self.notified_status,
+                    days,
+                )
+                continue
+
+            if not appointment["phone"]:
+                logger.info(
+                    "Skipping appointment %s: no recipient phone number",
+                    appointment_id,
+                )
+                reminders_skipped_total.inc(label_values=("no_phone",))
                 continue
 
             raw_phone = (appointment["phone"] or "").strip()
@@ -378,6 +394,7 @@ class ReminderWorker:
                 a.car_make,
                 a.car_plate,
                 a.notes,
+                COALESCE(NULLIF(a.car_location, ''), 'у владельца') AS car_location,
                 COALESCE(s.name, '') AS appointment_type,
                 COALESCE(NULLIF(u.phone_number, ''), u.mobile_number, '') AS phone,
                 COALESCE(u.email, '') AS email,
@@ -415,6 +432,12 @@ class ReminderWorker:
         cursor.execute(
             f"UPDATE {self.table_prefix}appointments SET status = %s WHERE id = %s",
             (self.error_status, appointment_id),
+        )
+
+    def mark_notified(self, cursor, appointment_id: int) -> None:
+        cursor.execute(
+            f"UPDATE {self.table_prefix}appointments SET status = %s WHERE id = %s",
+            (self.notified_status, appointment_id),
         )
 
     def notify_telegram(self, appointment: dict, phone: str) -> None:
