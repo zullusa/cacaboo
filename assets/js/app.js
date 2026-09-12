@@ -50,6 +50,37 @@ window.App = (function () {
         if (window.moment) {
             window.moment.locale(vars('language_code'));
         }
+
+        // Close any open modal when the Escape key is pressed.
+        //
+        // Bootstrap already does this when the focus is inside the modal, but
+        // this document level handler makes it work regardless of the focused
+        // element so that every modal in the application can be dismissed.
+        $(document).on('keydown', (event) => {
+            if (event.key !== 'Escape') {
+                return;
+            }
+
+            const $modal = $('.modal.show').last();
+
+            if (!$modal.length) {
+                return;
+            }
+
+            const modalInstance = bootstrap.Modal.getInstance($modal[0]);
+
+            // Respect modals that were explicitly created as non-dismissible
+            // (e.g. blocking message boxes that require a decision).
+            if (modalInstance && modalInstance._config && modalInstance._config.keyboard === false) {
+                return;
+            }
+
+            if (modalInstance) {
+                modalInstance.hide();
+            } else {
+                $modal.modal('hide');
+            }
+        });
     });
 
     return {
