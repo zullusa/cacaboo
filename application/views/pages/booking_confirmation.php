@@ -10,6 +10,7 @@
 
         <h3 class="text-success fw-semibold mb-4"><?= lang('appointment_registered') ?></h3>
 
+        <?php if (vars('customer_has_email')): ?>
         <p class="fs-5 text-muted mb-1">
             <?= lang('appointment_details_was_sent_to_you') ?>
         </p>
@@ -17,6 +18,11 @@
         <p class="text-muted small mb-4">
             <?= lang('check_spam_folder') ?>
         </p>
+        <?php else: ?>
+        <p class="fs-5 text-muted mb-4">
+            <?= lang('appointment_details_available_in_calendar') ?>
+        </p>
+        <?php endif; ?>
 
         <div class="d-flex flex-column flex-sm-row gap-2 justify-content-center mt-4">
             <a href="<?= site_url() ?>" class="btn btn-primary px-4 py-2">

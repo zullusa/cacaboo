@@ -11,6 +11,8 @@
 /docker/sms/
 /node_modules/
 /npm-debug.log
+/test-results/
+/playwright-report/
 /assets/js/**/*.min.js
 /assets/css/**/*.css
 /assets/vendor

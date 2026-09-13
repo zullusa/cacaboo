@@ -42,6 +42,7 @@ $lang['appointment_cancelled_title'] = 'Назначение отменено';
 $lang['reason'] = 'Причина';
 $lang['appointment_removed_from_schedule'] = 'Следующее назначение было удалено из расписания компании.';
 $lang['appointment_details_was_sent_to_you'] = 'Письмо с деталями заказа уже вам отправлено.';
+$lang['appointment_details_available_in_calendar'] = 'Информация о записи доступна в вашем личном кабинете.';
 $lang['add_to_google_calendar'] = 'Добавить в Google-календарь';
 $lang['appointment_booked'] = 'Ваше назначение успешно внесено в заказ.';
 $lang['thank_you_for_appointment'] = 'Благодарим за оформление встречи с нами. Ниже вы сможете увидеть сведения о встречах. Можете делать изменения, нажав на ссылку назначения.';
