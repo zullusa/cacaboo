@@ -80,6 +80,12 @@ sms_acknowledged_total = Counter(
     ["provider"],
 )
 
+sms_forwarded_total = Counter(
+    "sms_forwarded_total",
+    "Total SMS handed off to another provider's queue (e.g. Beeline)",
+    ["provider"],
+)
+
 sms_delayed_total = Counter(
     "sms_delayed_total",
     "Total SMS moved to the delayed/retry queue",

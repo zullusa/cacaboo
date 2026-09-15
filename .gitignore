@@ -16,8 +16,8 @@
 /assets/js/**/*.min.js
 /assets/css/**/*.css
 /assets/vendor
-/.env
-!.env.example
+/.env*
+!.env.*.example
 /storage/backups/*
 !/storage/backups/.htaccess
 !/storage/backups/index.html

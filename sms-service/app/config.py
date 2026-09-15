@@ -35,6 +35,9 @@ class Settings:
     sms_send_workers: int
     sms_status_workers: int
     sms_drain_interval: float
+    sms_forward_queue: str
+    sms_forward_exchange: str
+    sms_forward_routing_key: str
     sms_poll_cron: str
     telegram_bot_token: str
     telegram_channel_id: str
@@ -78,6 +81,13 @@ class Settings:
             notified_exchange=environ.get("RABBITMQ_NOTIFIED_EXCHANGE", "notified_exchange"),
             notified_routing_key=environ.get("RABBITMQ_NOTIFIED_ROUTING_KEY", "notified"),
             sms_delayed_queue=environ.get("SMS_DELAYED_QUEUE", "sms_delayed"),
+            sms_forward_queue=environ.get(
+                "SMS_FORWARD_QUEUE", ""
+            ).strip(),
+            sms_forward_exchange=environ.get("SMS_FORWARD_EXCHANGE", "").strip(),
+            sms_forward_routing_key=environ.get(
+                "SMS_FORWARD_ROUTING_KEY", ""
+            ).strip(),
             sms_send_workers=int(environ.get("SMS_SEND_WORKERS", "4")),
             sms_status_workers=int(environ.get("SMS_STATUS_WORKERS", "4")),
             sms_drain_interval=float(environ.get("SMS_DRAIN_INTERVAL", "1.0")),

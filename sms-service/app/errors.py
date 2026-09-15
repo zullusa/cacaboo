@@ -23,5 +23,15 @@ class SmsStatusError(SmsServiceError):
     """Raised when a gateway delivery status could not be retrieved."""
 
 
+class SmsForwardedError(SmsServiceError):
+    """Raised after a message was handed off to another provider's queue.
+
+    Used when the routing sender decides that a number belongs to another
+    provider (e.g. Beeline) and re-publishes the message to that provider's
+    own queue. The caller must NOT acknowledge (or fail) the message, because
+    the downstream provider worker will report the delivery status.
+    """
+
+
 class InvalidMessageError(SmsServiceError):
     """Raised when a consumed message has no phone number or text."""

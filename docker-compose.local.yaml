@@ -1,0 +1,29 @@
+# docker-compose.local.yaml
+#
+# Runs the provider-specific Keenetic modem SMS worker (Go). The worker
+# consumes the provider's own queue (RABBITMQ_QUEUE from the env file), sends
+# each SMS through the modem described in the same env file (MODEM_*) and
+# publishes the successful delivery to the notified feedback queue
+# (RABBITMQ_NOTIFIED_*), exactly like the sms-service does.
+#
+# The provider env file is selected through PROVIDER_ENV_FILE, so this single
+# compose file can serve any provider (or several, one per env file):
+#
+#   docker compose -f docker-compose.local.yaml up -d --build
+#     -> uses .env.beeline  (queue notifications_beeline, Beeline modem)
+#
+#   PROVIDER_ENV_FILE=.env.mts docker compose -f docker-compose.local.yaml up -d --build
+#     -> same worker, but the .env.mts modem / queue (e.g. MTS)
+#
+# To run several providers at once give each its own compose project name:
+#
+#   PROVIDER_ENV_FILE=.env.beeline docker compose -p modem-beeline -f docker-compose.local.yaml up -d --build
+#   PROVIDER_ENV_FILE=.env.mts     docker compose -p modem-mts     -f docker-compose.local.yaml up -d --build
+services:
+  modem-service-beeline:
+    build: modem-service
+    env_file:
+      - ${PROVIDER_ENV_FILE:-.env.beeline}
+    ports:
+      - '${MODEM_METRICS_PORT:-8004}:8004'
+    restart: always

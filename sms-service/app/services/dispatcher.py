@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 
 from app.domain.models import SmsMessage
-from app.errors import SmsDelayedError, SmsServiceError
+from app.errors import SmsDelayedError, SmsForwardedError, SmsServiceError
 from app.interfaces.protocols import (
     DelayedPublisher,
     DeliveryStatus,
@@ -20,6 +20,7 @@ from app.metrics import (
     sms_drain_errors_total,
     sms_drained_total,
     sms_delivery_wait_seconds,
+    sms_forwarded_total,
     sms_send_duration_seconds,
     sms_send_queue_size,
     sms_sent_total,
@@ -162,6 +163,10 @@ class SmsDispatchService:
         start = time.monotonic()
         try:
             tracking_id = self._sender.send(message)
+        except SmsForwardedError:
+            logger.info("SMS to %s handed off to a provider queue", message.phone_number)
+            sms_forwarded_total.labels(provider=self._provider).inc()
+            return
         except SmsDelayedError as exc:
             logger.error(
                 "Message deferred (%s); moving to delayed queue", exc

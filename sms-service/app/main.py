@@ -8,6 +8,8 @@ from app.services import dispatcher as dispatcher_module
 from app.services.authenticator import KeeneticAuthenticator
 from app.services.delayed_publisher import RabbitMqDelayedPublisher
 from app.services.dispatcher import SmsDispatchService
+from app.services.forward_publisher import RabbitMqForwardPublisher
+from app.services.forward_sender import ForwardingSmsSender
 from app.services.notified_publisher import RabbitMqNotifiedPublisher
 from app.services.operator_lookup import OperatorLookup
 from app.services.operator_store import SqliteOperatorStore
@@ -85,18 +87,66 @@ def _build_smsru(settings: Settings) -> SenderConfig:
     )
 
 
+# Providers served by dedicated modem workers (modem-service). Extend this
+# mapping to add more providers; each provider maps to the phone-operator
+# keywords used by RoutingSmsSender to detect its numbers (matched as
+# lower-case substrings). Messages of these providers are moved into the shared
+# SMS_FORWARD_QUEUE with a "provider" routing key in the payload, and the
+# modem-service instance configured for that provider delivers them.
+FORWARDED_PROVIDERS: dict[str, frozenset[str]] = {
+    "beeline": frozenset({"билайн", "beeline", "вымпелком"}),
+}
+
+
+def _build_forward(settings: Settings) -> dict[str, ForwardingSmsSender]:
+    """One forwarding sender per provider in FORWARDED_PROVIDERS.
+
+    All senders share a single publisher because every forwarded message lands
+    in the same queue (SMS_FORWARD_QUEUE) and carries its own provider key.
+    """
+    if not settings.sms_forward_queue:
+        if FORWARDED_PROVIDERS:
+            logger.warning(
+                "SMS_FORWARD_QUEUE is not configured; messages for %s will go "
+                "through the default sender instead",
+                ", ".join(sorted(FORWARDED_PROVIDERS)),
+            )
+        return {}
+
+    publisher = RabbitMqForwardPublisher(
+        host=settings.rabbitmq_host,
+        port=settings.rabbitmq_port,
+        user=settings.rabbitmq_user,
+        password=settings.rabbitmq_password,
+        vhost=settings.rabbitmq_vhost,
+        queue_name=settings.sms_forward_queue,
+        exchange=settings.sms_forward_exchange,
+        routing_key=settings.sms_forward_routing_key,
+        heartbeat=settings.rabbitmq_heartbeat,
+    )
+
+    return {
+        provider: ForwardingSmsSender(provider=provider, publisher=publisher)
+        for provider in FORWARDED_PROVIDERS
+    }
+
+
 def _build_routing(settings: Settings) -> SenderConfig:
-    """SMS_PROVIDER=routing: Megafon and Yota via Keenetic modem, everyone else
-    via sms.ru.
+    """SMS_PROVIDER=routing: Megafon and Yota via Keenetic modem, providers from
+    FORWARDED_PROVIDERS (e.g. Beeline) via the shared provider queue, everyone
+    else via sms.ru.
 
     The operator is resolved per number through the MNO lookup (kody.su
     check-tel) and the matching sender is used. sms.ru is the default (and
     provides the delivery-tracking id, since modem reports are unavailable).
+    Forwarded numbers are handed off to the dedicated modem-service instance,
+    which sends them through its own modem and reports delivery to the notified
+    queue.
     """
     if not settings.sms_gate_api_key:
         raise RuntimeError(
             "SMS_PROVIDER=routing requires SMS_GATE_API_KEY (sms.ru for "
-            "non-Megafon numbers)"
+            "non-Megafon/non-forwarded numbers)"
         )
     keenetic_cfg = _build_keenetic(settings)
     smsru_cfg = _build_smsru(settings)
@@ -107,13 +157,21 @@ def _build_routing(settings: Settings) -> SenderConfig:
         store=store,
         cache_ttl=settings.sms_operator_ttl_days * 24 * 3600,
     )
+    operator_sender_map = {
+        "мегафон": keenetic_cfg.sender,
+        "йота": keenetic_cfg.sender,
+        "yota": keenetic_cfg.sender,
+    }
+    forward_senders = _build_forward(settings)
+    for provider, keywords in FORWARDED_PROVIDERS.items():
+        forward_sender = forward_senders.get(provider)
+        if forward_sender is None:
+            continue
+        for keyword in keywords:
+            operator_sender_map[keyword] = forward_sender
     sender = RoutingSmsSender(
         operator_lookup=lookup,
-        operator_sender_map={
-            "мегафон": keenetic_cfg.sender,
-            "йота": keenetic_cfg.sender,
-            "yota": keenetic_cfg.sender,
-        },
+        operator_sender_map=operator_sender_map,
         default_sender=smsru_cfg.sender,
     )
     return SenderConfig(
