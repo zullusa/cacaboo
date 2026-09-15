@@ -33,6 +33,13 @@ services:
     volumes:
       - '.:/var/www/html'
       - './docker/php-fpm/php-ini-overrides.ini:/usr/local/etc/php/conf.d/99-overrides.ini'
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
+        fluentd-async: 'true'
+        fluentd-sub-second-precision: 'true'
+        tag: 'php-fpm'
     depends_on:
       - mysql
 
@@ -47,6 +54,13 @@ services:
       - '${NGINX_PORT:-80}:80'
     depends_on:
       - php-fpm
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
+        fluentd-async: 'true'
+        fluentd-sub-second-precision: 'true'
+        tag: 'nginx'
     networks:
       - default
       - monitoring
@@ -67,6 +81,13 @@ services:
       --slow-query-log=ON
       --slow-query-log-file=/var/lib/mysql/slow.log
       --long-query-time=2
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
+        fluentd-async: 'true'
+        fluentd-sub-second-precision: 'true'
+        tag: 'mysql'
     networks:
       - default
       - monitoring
@@ -78,6 +99,13 @@ services:
     environment:
       - 'PMA_HOST=mysql'
       - 'UPLOAD_LIMIT=102400K'
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
+        fluentd-async: 'true'
+        fluentd-sub-second-precision: 'true'
+        tag: 'phpmyadmin'
     depends_on:
       - mysql
 
@@ -124,6 +152,13 @@ services:
     depends_on:
       - mysql
     restart: unless-stopped
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
+        fluentd-async: 'true'
+        fluentd-sub-second-precision: 'true'
+        tag: 'reminder-worker'
     networks:
       - default
       - monitoring
@@ -154,6 +189,13 @@ services:
     depends_on:
       - mysql
     restart: unless-stopped
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
+        fluentd-async: 'true'
+        fluentd-sub-second-precision: 'true'
+        tag: 'backup-worker'
     networks:
       - default
       - monitoring
@@ -205,6 +247,13 @@ services:
     depends_on:
       - mysql
     restart: unless-stopped
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
+        fluentd-async: 'true'
+        fluentd-sub-second-precision: 'true'
+        tag: 'sms-service'
     networks:
       - default
       - monitoring
@@ -216,6 +265,13 @@ services:
     environment:
       - MODEM_USER=${MODEM_USER:-samsa}
       - MODEM_PASSWORD=${MODEM_PASSWORD:-samsa}
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
+        fluentd-async: 'true'
+        fluentd-sub-second-precision: 'true'
+        tag: 'keenetic-mock'
     restart: unless-stopped
 
   swagger-ui:
@@ -227,6 +283,13 @@ services:
       - ./openapi.yml:/usr/share/nginx/html/openapi.yml
     environment:
       API_URL: openapi.yml
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
+        fluentd-async: 'true'
+        fluentd-sub-second-precision: 'true'
+        tag: 'swagger-ui'
     depends_on:
       - php-fpm
 
@@ -418,14 +481,16 @@ services:
     volumes:
       - './docker/monitoring/fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro'
       - './docker/monitoring/fluent-bit/parsers.conf:/fluent-bit/etc/parsers.conf:ro'
-      - '/var/lib/docker/containers:/var/log/containers:ro'
+      - './docker/monitoring/fluent-bit/set_service.lua:/fluent-bit/etc/set_service.lua:ro'
       - 'nginx-logs:/var/log/nginx:ro'
       - './storage/logs:/var/log/ci-app:ro'
     ports:
+      - '${FLUENTBIT_FORWARD_PORT:-24224}:24224'
       - '${FLUENTBIT_METRICS_PORT:-2020}:2020'
     depends_on:
       - opensearch
     networks:
+      - default
       - monitoring
 
   opensearch-exporter:
