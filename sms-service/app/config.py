@@ -18,6 +18,12 @@ class Settings:
     sms_gate_status_poll_interval: int
     sms_status_max_retries: int
     sms_gate_from: str
+    sms_ru_work_hours_start: int
+    sms_ru_work_hours_end: int
+    sms_ru_work_timezone: str
+    sms_pending_queued_db_path: str
+    sms_pending_queued_poll_interval: float
+    sms_pending_queued_max_checks: int
     rabbitmq_host: str
     rabbitmq_port: int
     rabbitmq_user: str
@@ -67,6 +73,22 @@ class Settings:
             ),
             sms_status_max_retries=int(environ.get("SMS_STATUS_MAX_RETRIES", "3")),
             sms_gate_from=environ.get("SMS_GATE_FROM", ""),
+            sms_ru_work_hours_start=int(
+                environ.get("SMS_RU_WORK_HOURS_START", "10")
+            ),
+            sms_ru_work_hours_end=int(environ.get("SMS_RU_WORK_HOURS_END", "20")),
+            sms_ru_work_timezone=environ.get(
+                "SMS_RU_WORK_TIMEZONE", "Europe/Moscow"
+            ),
+            sms_pending_queued_db_path=environ.get(
+                "SMS_PENDING_QUEUED_DB_PATH", "/app/data/pending_queued.db"
+            ),
+            sms_pending_queued_poll_interval=float(
+                environ.get("SMS_PENDING_QUEUED_POLL_INTERVAL", "60")
+            ),
+            sms_pending_queued_max_checks=int(
+                environ.get("SMS_PENDING_QUEUED_MAX_CHECKS", "120")
+            ),
             rabbitmq_host=environ.get("RABBITMQ_HOST", "rabbitmq"),
             rabbitmq_port=int(environ.get("RABBITMQ_PORT", "5672")),
             rabbitmq_user=environ.get("RABBITMQ_USER", "sms"),

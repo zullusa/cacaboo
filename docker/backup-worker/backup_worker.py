@@ -8,6 +8,11 @@ Backup files are named ``<BACKUP_NAME_PREFIX>_YYYY-MM-DD_HHMMSS.sql.gz`` and the
 oldest files are pruned from the share once they are older than
 ``BACKUP_RETENTION_DAYS``.
 
+If an attempt fails (MySQL not ready, SMB/network error, ...) the day is not
+marked as done and the backup is retried on the next cycle until it succeeds
+or the day ends. Before the first attempt the worker waits for MySQL to accept
+connections (``DB_READY_TIMEOUT``).
+
 All configuration values are read from environment variables so that the
 worker can be deployed together with the rest of the Easy!Appointments stack
 in Docker.
@@ -74,6 +79,7 @@ class BackupWorker:
         self.backup_time = get_backup_time()
         self.retention_days = int(env("BACKUP_RETENTION_DAYS", "30"))
         self.run_on_start = env("BACKUP_RUN_ON_START", "false").lower() in ("1", "true", "yes")
+        self.db_ready_timeout = int(env("DB_READY_TIMEOUT", "120"))
         self.prefix = env("BACKUP_NAME_PREFIX", "cacaboo")
         self.local_dir = Path(env("BACKUP_LOCAL_DIR", "/backups"))
         self.smb_host = env("SMB_HOST")
@@ -92,9 +98,69 @@ class BackupWorker:
     def stop(self) -> None:
         self.should_stop = True
 
+    def db_ready_check(self) -> None:
+        """Connect to MySQL and run a trivial query; raise on any failure."""
+        subprocess_env = dict(os.environ)
+        subprocess_env["MYSQL_PWD"] = self.db_config["password"]
+
+        result = subprocess.run(
+            [
+                "mysql",
+                "-h",
+                self.db_config["host"],
+                "-P",
+                self.db_config["port"],
+                "-u",
+                self.db_config["user"],
+                "-N",
+                "-B",
+                "-e",
+                "SELECT 1",
+            ],
+            env=subprocess_env,
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            stderr = result.stderr.strip()
+            raise RuntimeError(
+                "MySQL is not ready yet"
+                + (f": {stderr}" if stderr else "")
+            )
+
+    def wait_for_database(self) -> None:
+        """Block until MySQL accepts connections or DB_READY_TIMEOUT elapses."""
+        deadline = time.monotonic() + self.db_ready_timeout
+        warned = False
+
+        while not self.should_stop:
+            try:
+                self.db_ready_check()
+                if warned:
+                    logger.info("MySQL is ready, continuing")
+                return
+            except Exception as exc:
+                if time.monotonic() >= deadline:
+                    raise RuntimeError(
+                        f"MySQL did not become ready within {self.db_ready_timeout}s"
+                    ) from exc
+                if not warned:
+                    logger.warning(
+                        "Waiting for MySQL to become ready (timeout=%ss): %s",
+                        self.db_ready_timeout,
+                        exc,
+                    )
+                    warned = True
+                time.sleep(5)
+
+        raise RuntimeError("Backup worker stopped while waiting for MySQL")
+
     def run(self) -> None:
         signal.signal(signal.SIGTERM, lambda *_: self.stop())
         signal.signal(signal.SIGINT, lambda *_: self.stop())
+
+        self.wait_for_database()
 
         logger.info(
             "Backup worker started (time=%s:%s, retention=%s days, share=%s/%s)",
@@ -127,16 +193,21 @@ class BackupWorker:
         if not self.run_on_start and (now.hour, now.minute) < self.backup_time:
             return
 
-        self.last_backup_date = now.date()
-        self.run_backup(now)
+        if self.run_backup(now):
+            self.last_backup_date = now.date()
 
-    def run_backup(self, now: datetime) -> None:
+    def run_backup(self, now: datetime) -> bool:
+        """Run one backup attempt and return True only on success.
+
+        On failure the day is *not* marked as done, so the next cycle
+        retries the backup until it succeeds or the day ends.
+        """
         if not self.smb_host or not self.smb_share or not self.smb_username:
             logger.error(
                 "SMB share is not configured (SMB_HOST, SMB_SHARE, SMB_USERNAME), skipping the backup",
             )
             backup_failures_total.inc()
-            return
+            return False
 
         self.local_dir.mkdir(parents=True, exist_ok=True)
 
@@ -153,9 +224,11 @@ class BackupWorker:
             backup_success_total.inc()
             backup_duration_seconds.inc(time.monotonic() - started_at)
             logger.info("Backup uploaded: %s", archive_path.name)
+            return True
         except Exception:
             logger.exception("Backup failed")
             backup_failures_total.inc()
+            return False
         finally:
             for path in (dump_path, archive_path):
                 if path.exists():
@@ -181,12 +254,19 @@ class BackupWorker:
         ]
 
         with open(destination, "wb") as dump_file:
-            subprocess.run(
+            result = subprocess.run(
                 command,
                 env=subprocess_env,
-                check=True,
+                check=False,
                 stdout=dump_file,
                 stderr=subprocess.PIPE,
+            )
+
+        if result.returncode != 0:
+            stderr = result.stderr.decode("utf-8", errors="replace").strip()
+            raise RuntimeError(
+                "mysqldump exited with code "
+                f"{result.returncode}{': ' + stderr if stderr else ''}"
             )
 
     def compress(self, source: Path, destination: Path) -> None:
@@ -212,13 +292,21 @@ class BackupWorker:
             "-c",
             command,
         ]
-        return subprocess.run(
+        result = subprocess.run(
             args,
             env=self.smb_env(),
-            check=True,
+            check=False,
             capture_output=True,
             text=True,
         )
+        if result.returncode != 0:
+            details = [f"exit code {result.returncode}"]
+            if result.stderr.strip():
+                details.append(f"stderr: {result.stderr.strip()}")
+            if result.stdout.strip():
+                details.append(f"stdout: {result.stdout.strip()}")
+            raise RuntimeError("smbclient failed: " + "; ".join(details))
+        return result
 
     def remote_name(self, local_file: Path) -> str:
         return f"{self.smb_path}/{local_file.name}" if self.smb_path else local_file.name

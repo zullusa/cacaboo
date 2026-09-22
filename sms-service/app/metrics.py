@@ -92,6 +92,32 @@ sms_delayed_total = Counter(
     ["provider"],
 )
 
+# ── Gateway-queued SMS metrics ──────────────────────────────────────
+
+sms_queued_total = Counter(
+    "sms_queued_total",
+    "SMS accepted by the gateway but queued until its working hours",
+    ["provider"],
+)
+
+sms_pending_delivered_total = Counter(
+    "sms_pending_delivered_total",
+    "Queued-until-working-hours SMS later confirmed as delivered",
+    ["provider"],
+)
+
+sms_pending_failed_total = Counter(
+    "sms_pending_failed_total",
+    "Queued-until-working-hours SMS that ended in a terminal failure",
+    ["provider"],
+)
+
+sms_pending_exhausted_total = Counter(
+    "sms_pending_exhausted_total",
+    "Queued-until-working-hours SMS dropped after repeated status checks",
+    ["provider"],
+)
+
 # ── Consumer / drain metrics ────────────────────────────────────────
 
 sms_drained_total = Counter(

@@ -13,6 +13,7 @@ from app.services.forward_sender import ForwardingSmsSender
 from app.services.notified_publisher import RabbitMqNotifiedPublisher
 from app.services.operator_lookup import OperatorLookup
 from app.services.operator_store import SqliteOperatorStore
+from app.services.pending_store import SqlitePendingQueuedStore
 from app.services.rabbitmq_consumer import RabbitMqConsumer
 from app.services.routing_sender import RoutingSmsSender
 from app.services.sms_aero import SmsAeroSmsSender
@@ -78,6 +79,9 @@ def _build_smsru(settings: Settings) -> SenderConfig:
     sender = SmsRuSmsSender(
         api_id=settings.sms_gate_api_key,
         from_name=settings.sms_gate_from or None,
+        work_hours_start=settings.sms_ru_work_hours_start,
+        work_hours_end=settings.sms_ru_work_hours_end,
+        work_timezone=settings.sms_ru_work_timezone,
     )
     return SenderConfig(
         sender=sender,
@@ -245,6 +249,9 @@ def main() -> int:
         queue_name=settings.sms_delayed_queue,
         heartbeat=settings.rabbitmq_heartbeat,
     )
+    pending_queued_store = SqlitePendingQueuedStore(
+        settings.sms_pending_queued_db_path
+    )
 
     if (
         settings.sms_provider in ("keenetic", "routing")
@@ -281,6 +288,12 @@ def main() -> int:
         notified_publisher=notified_publisher,
         status_checker=status_checker,
         delayed_publisher=delayed_publisher,
+        queued_store=pending_queued_store,
+        work_hours_start=settings.sms_ru_work_hours_start,
+        work_hours_end=settings.sms_ru_work_hours_end,
+        work_timezone=settings.sms_ru_work_timezone,
+        queued_poll_interval=settings.sms_pending_queued_poll_interval,
+        queued_max_checks=settings.sms_pending_queued_max_checks,
         status_timeout=(
             sender_config.status_timeout
             if status_checker

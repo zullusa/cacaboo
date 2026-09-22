@@ -3,6 +3,8 @@ import queue
 import threading
 import time
 from dataclasses import dataclass
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from app.domain.models import SmsMessage
 from app.errors import SmsDelayedError, SmsForwardedError, SmsServiceError
@@ -11,6 +13,7 @@ from app.interfaces.protocols import (
     DeliveryStatus,
     MessageConsumer,
     NotifiedPublisher,
+    QueuedSmsStore,
     SmsSender,
     SmsStatusChecker,
 )
@@ -21,6 +24,10 @@ from app.metrics import (
     sms_drained_total,
     sms_delivery_wait_seconds,
     sms_forwarded_total,
+    sms_pending_delivered_total,
+    sms_pending_exhausted_total,
+    sms_pending_failed_total,
+    sms_queued_total,
     sms_send_duration_seconds,
     sms_send_queue_size,
     sms_sent_total,
@@ -76,6 +83,12 @@ class SmsDispatchService:
         send_workers: int = 4,
         status_workers: int = 4,
         provider: str = "unknown",
+        queued_store: QueuedSmsStore | None = None,
+        work_hours_start: int = 10,
+        work_hours_end: int = 20,
+        work_timezone: str = "Europe/Moscow",
+        queued_poll_interval: float = 60.0,
+        queued_max_checks: int = 120,
     ) -> None:
         self._consumer = consumer
         self._sender = sender
@@ -89,6 +102,12 @@ class SmsDispatchService:
         self._send_workers = max(1, send_workers)
         self._status_workers = max(1, status_workers)
         self._provider = provider
+        self._queued_store = queued_store
+        self._work_hours_start = work_hours_start
+        self._work_hours_end = work_hours_end
+        self._work_timezone = ZoneInfo(work_timezone)
+        self._queued_poll_interval = max(1.0, queued_poll_interval)
+        self._queued_max_checks = max(1, queued_max_checks)
 
         self._to_send: queue.Queue = queue.Queue()
         self._to_check: queue.Queue = queue.Queue()
@@ -105,6 +124,12 @@ class SmsDispatchService:
             )
             for i in range(self._status_workers)
         ]
+        if self._queued_store is not None:
+            threads.append(
+                threading.Thread(
+                    target=self._queued_loop, name="sms-queued", daemon=True
+                )
+            )
         for t in threads:
             t.start()
 
@@ -226,6 +251,12 @@ class SmsDispatchService:
         if status.delivered:
             sms_status_checks_total.labels(provider=self._provider, result="delivered").inc()
             self._acknowledge(message)
+        elif status.queued:
+            # The gateway accepted the message but holds it in its own queue
+            # (e.g. sms.ru outside its working hours). Remember the sms_id so
+            # the delivery status can be re-checked once working hours begin.
+            sms_status_checks_total.labels(provider=self._provider, result="queued").inc()
+            self._remember_queued(pending)
         else:
             sms_status_checks_total.labels(provider=self._provider, result="not_delivered").inc()
             logger.warning(
@@ -235,6 +266,95 @@ class SmsDispatchService:
                 status.timed_out,
                 message.appointment_id,
             )
+
+    def _remember_queued(self, pending: _PendingStatus) -> None:
+        if self._queued_store is None:
+            logger.warning(
+                "SMS %s queued at the gateway but no queued store is "
+                "configured; its delivery status will not be re-checked",
+                pending.tracking_id,
+            )
+            return
+        self._queued_store.add(pending.tracking_id, pending.message)
+        sms_queued_total.labels(provider=self._provider).inc()
+        logger.info(
+            "SMS %s queued by the gateway (until working hours); "
+            "will re-check its status later",
+            pending.tracking_id,
+        )
+
+    # ── queued-until-working-hours delivery re-check ──────────────────
+
+    def _queued_loop(self) -> None:
+        while not self._stop.is_set():
+            try:
+                self._check_queued_delivery()
+            except Exception:  # noqa: BLE001 - keep the re-check loop alive
+                logger.exception("Queued-delivery re-check failed")
+            self._stop.wait(timeout=self._queued_poll_interval)
+
+    def _check_queued_delivery(self) -> None:
+        """Re-check SMS queued by the gateway once the working hours began.
+
+        Outside the working hours nothing happens: the queued messages stay in
+        the store untouched. Inside the working hours every stored sms_id is
+        given a fresh status wait window; confirmed deliveries are
+        acknowledged, terminal failures are dropped, and anything still
+        pending is kept for the next cycle.
+        """
+        if self._queued_store is None or self._status_checker is None:
+            return
+
+        hour = datetime.now(self._work_timezone).hour
+        if not (self._work_hours_start <= hour < self._work_hours_end):
+            # Messages stay in the store untouched until working hours begin.
+            return
+
+        for sms_id, message, attempts in self._queued_store.list():
+            try:
+                status = self._status_checker.wait_for_delivery(
+                    sms_id,
+                    timeout=self._status_timeout,
+                    poll_interval=self._status_poll_interval,
+                )
+            except Exception:  # noqa: BLE001 - never kill the re-check loop
+                logger.exception(
+                    "Status re-check failed for queued SMS %s; keeping it", sms_id
+                )
+                self._queued_store.touch(sms_id)
+                continue
+
+            if status.delivered:
+                self._queued_store.remove(sms_id)
+                sms_pending_delivered_total.labels(provider=self._provider).inc()
+                logger.info(
+                    "Queued SMS %s delivered; acknowledging appointment %s",
+                    sms_id,
+                    message.appointment_id,
+                )
+                self._acknowledge(message)
+            elif status.queued or status.timed_out:
+                new_attempts = self._queued_store.touch(sms_id)
+                if new_attempts >= self._queued_max_checks:
+                    self._queued_store.remove(sms_id)
+                    sms_pending_exhausted_total.labels(provider=self._provider).inc()
+                    logger.warning(
+                        "Queued SMS %s not delivered after %d attempt(s); "
+                        "dropping it",
+                        sms_id,
+                        new_attempts,
+                    )
+                else:
+                    logger.info(
+                        "Queued SMS %s still not delivered; will re-check",
+                        sms_id,
+                    )
+            else:
+                self._queued_store.remove(sms_id)
+                sms_pending_failed_total.labels(provider=self._provider).inc()
+                logger.warning(
+                    "Queued SMS %s ended in a terminal failure", sms_id
+                )
 
     def _await_delivery(self, tracking_id: str) -> DeliveryStatus:
         """Wait for delivery, retrying when the wait window simply times out.

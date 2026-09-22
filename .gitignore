@@ -37,3 +37,10 @@
 .DS_Store
 **.pyc
 **/__pycache__/*
+**/node_modules
+**/.nuxt
+**/.output
+**/.data
+**/dist
+**/.env
+**/*.log

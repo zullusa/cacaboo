@@ -7,6 +7,8 @@ was actually delivered.
 
 import logging
 import time
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -29,6 +31,7 @@ _DEFERABLE_LIMIT_CODES = {
 }
 
 # sms.ru status_code values (see /api/status).
+_STATUS_QUEUED = 100  # сообщение находится в очереди sms.ru
 _STATUS_DELIVERED = 103
 # Terminal statuses that are considered a failure (no further retries).
 _STATUS_FAILED = {
@@ -37,7 +40,13 @@ _STATUS_FAILED = {
 
 
 class SmsRuSmsSender(SmsSender, SmsStatusChecker):
-    """Sends SMS via sms.ru and checks their delivery status."""
+    """Sends SMS via sms.ru and checks their delivery status.
+
+    sms.ru only sends messages during the account's working hours (by default
+    10:00-20:00). A message submitted outside them is accepted right away but
+    stays queued on the sms.ru side (status_code 100) until the working hours
+    begin, so its delivery status cannot become terminal until then.
+    """
 
     def __init__(
         self,
@@ -45,12 +54,18 @@ class SmsRuSmsSender(SmsSender, SmsStatusChecker):
         from_name: str | None = None,
         base_url: str = SMSRU_BASE,
         timeout: float = 15.0,
+        work_hours_start: int = 10,
+        work_hours_end: int = 20,
+        work_timezone: str = "Europe/Moscow",
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._api_id = api_id
         self._from_name = from_name
         self._timeout = timeout
         self._session = requests.Session()
+        self._work_hours_start = work_hours_start
+        self._work_hours_end = work_hours_end
+        self._work_timezone = ZoneInfo(work_timezone)
 
     # ── SmsSender ──────────────────────────────────────────────────────
 
@@ -133,10 +148,27 @@ class SmsRuSmsSender(SmsSender, SmsStatusChecker):
                 )
                 return DeliveryStatus(delivered=False)
 
+            if status_code == _STATUS_QUEUED and self._outside_working_hours():
+                # sms.ru holds the message until its working hours begin, so
+                # polling it now is pointless. Ask the caller to remember the
+                # sms_id and re-check the status once working hours start.
+                logger.info(
+                    "SMS %s queued at sms.ru until working hours "
+                    "(%02d:00-%02d:00)",
+                    tracking_id,
+                    self._work_hours_start,
+                    self._work_hours_end,
+                )
+                return DeliveryStatus(delivered=False, queued=True)
+
             time.sleep(poll_interval)
 
         logger.warning("SMS %s status check timed out", tracking_id)
         return DeliveryStatus(delivered=False, timed_out=True)
+
+    def _outside_working_hours(self) -> bool:
+        hour = datetime.now(self._work_timezone).hour
+        return not (self._work_hours_start <= hour < self._work_hours_end)
 
     def _fetch_status(self, tracking_id: str) -> int:
         try:

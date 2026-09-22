@@ -41,7 +41,8 @@ services:
         fluentd-sub-second-precision: 'true'
         tag: 'php-fpm'
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
 
   nginx:
     image: 'nginx:1.23.3-alpine'
@@ -81,6 +82,12 @@ services:
       --slow-query-log=ON
       --slow-query-log-file=/var/lib/mysql/slow.log
       --long-query-time=2
+    healthcheck:
+      test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     logging:
       driver: fluentd
       options:
@@ -107,7 +114,8 @@ services:
         fluentd-sub-second-precision: 'true'
         tag: 'phpmyadmin'
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
 
   reminder-worker:
     build: docker/reminder-worker
@@ -150,7 +158,8 @@ services:
     ports:
       - '${REMINDER_METRICS_PORT:-8002}:8002'
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     restart: unless-stopped
     logging:
       driver: fluentd
@@ -187,7 +196,8 @@ services:
     ports:
       - '${BACKUP_METRICS_PORT:-8003}:8003'
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     restart: unless-stopped
     logging:
       driver: fluentd
@@ -215,6 +225,12 @@ services:
       - SMS_GATE_STATUS_TIMEOUT=${SMS_GATE_STATUS_TIMEOUT:-120}
       - SMS_GATE_STATUS_POLL_INTERVAL=${SMS_GATE_STATUS_POLL_INTERVAL:-10}
       - SMS_STATUS_MAX_RETRIES=${SMS_STATUS_MAX_RETRIES:-3}
+      - SMS_RU_WORK_HOURS_START=${SMS_RU_WORK_HOURS_START:-10}
+      - SMS_RU_WORK_HOURS_END=${SMS_RU_WORK_HOURS_END:-20}
+      - SMS_RU_WORK_TIMEZONE=${SMS_RU_WORK_TIMEZONE:-Europe/Moscow}
+      - SMS_PENDING_QUEUED_DB_PATH=${SMS_PENDING_QUEUED_DB_PATH:-/app/data/pending_queued.db}
+      - SMS_PENDING_QUEUED_POLL_INTERVAL=${SMS_PENDING_QUEUED_POLL_INTERVAL:-60}
+      - SMS_PENDING_QUEUED_MAX_CHECKS=${SMS_PENDING_QUEUED_MAX_CHECKS:-120}
       - RABBITMQ_HOST=${RABBITMQ_HOST}
       - RABBITMQ_PORT=${RABBITMQ_PORT}
       - RABBITMQ_USER=${RABBITMQ_USER}
@@ -248,7 +264,8 @@ services:
     volumes:
       - './docker/sms/data:/app/data'
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     restart: unless-stopped
     logging:
       driver: fluentd
@@ -411,7 +428,8 @@ services:
     ports:
       - '${MYSQL_EXPORTER_PORT:-9104}:9104'
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     networks:
       - default
       - monitoring
