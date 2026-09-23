@@ -626,14 +626,19 @@ App.Components.AppointmentsModal = (function () {
             // Check phone number (must contain exactly 10 digits).
             const phoneInput = $appointmentsModal.find('#phone-number').val();
 
-            if (phoneInput && App.Utils.Validation.phoneDigits(phoneInput).length !== 10) {
+            // The value "0" is a valid marker for customers that do not want to
+            // provide a phone number (no SMS reminders), so the mask validation
+            // must be skipped in that case.
+            const noPhone = phoneInput === '0';
+
+            if (phoneInput && !noPhone && App.Utils.Validation.phoneDigits(phoneInput).length !== 10) {
                 $appointmentsModal.find('#phone-number').addClass('is-invalid');
                 throw new Error(lang('invalid_phone'));
             }
 
             // Warn if phone starts with 8 (likely country code digit instead of local number).
             const phoneDigits = App.Utils.Validation.phoneDigits(phoneInput);
-            if (phoneDigits.length === 10 && phoneDigits[0] === '8') {
+            if (!noPhone && phoneDigits.length === 10 && phoneDigits[0] === '8') {
                 if (!confirm(lang('phone_starts_with_8'))) {
                     $appointmentsModal.find('#phone-number').addClass('is-invalid');
                     throw new Error(lang('invalid_phone'));

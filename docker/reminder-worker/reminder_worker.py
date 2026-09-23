@@ -328,7 +328,9 @@ class ReminderWorker:
                 )
                 continue
 
-            if not appointment["phone"]:
+            # A phone value of "0" means the customer does not want to receive
+            # reminders, so it must be treated the same as a missing phone number.
+            if not appointment["phone"] or appointment["phone"].strip() == "0":
                 logger.info(
                     "Skipping appointment %s: no recipient phone number",
                     appointment_id,
@@ -406,6 +408,9 @@ class ReminderWorker:
             WHERE a.is_unavailability = 0
               AND a.status = %s
               AND a.start_datetime BETWEEN %s AND %s
+              -- Customers that entered "0" as their phone number must not
+              -- receive any reminders, so they are excluded from the query.
+              AND COALESCE(NULLIF(TRIM(u.phone_number), ''), TRIM(u.mobile_number), '') <> '0'
             """,
             (
                 self.booked_status,

@@ -104,11 +104,16 @@ class Customers_model extends EA_Model
         $require_city = filter_var(setting('require_city'), FILTER_VALIDATE_BOOLEAN);
         $require_zip_code = filter_var(setting('require_zip_code'), FILTER_VALIDATE_BOOLEAN);
 
+        // A phone number of "0" is a valid marker for customers that do not
+        // want to provide a phone number (e.g. no SMS reminders), so it must
+        // satisfy the required phone number check.
+        $phone_number = trim((string) ($customer['phone_number'] ?? ''));
+
         if (
             (empty($customer['first_name']) && $require_first_name) ||
             (empty($customer['last_name']) && $require_last_name) ||
             (empty($customer['email']) && $require_email) ||
-            (empty($customer['phone_number']) && $require_phone_number) ||
+            ($phone_number === '' && $require_phone_number) ||
             (empty($customer['address']) && $require_address) ||
             (empty($customer['city']) && $require_city) ||
             (empty($customer['zip_code']) && $require_zip_code)

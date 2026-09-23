@@ -652,7 +652,12 @@ App.Pages.Booking = (function () {
         // Validate phone number.
         const phoneNumber = $phoneNumber.val();
 
-        if (phoneNumber && !App.Utils.Validation.phone(phoneNumber)) {
+        // The value "0" is a valid marker for customers that do not want to
+        // provide a phone number (no SMS reminders), so the mask validation
+        // must be skipped in that case.
+        const noPhone = phoneNumber === '0';
+
+        if (phoneNumber && !noPhone && !App.Utils.Validation.phone(phoneNumber)) {
             $phoneNumber.addClass('is-invalid');
             $('#form-message').text(lang('invalid_phone'));
             return false;
@@ -660,7 +665,7 @@ App.Pages.Booking = (function () {
 
         // Warn if phone starts with 8 (likely country code digit instead of local number).
         const phoneDigits = App.Utils.Validation.phoneDigits(phoneNumber);
-        if (phoneDigits.length === 10 && phoneDigits[0] === '8') {
+        if (!noPhone && phoneDigits.length === 10 && phoneDigits[0] === '8') {
             if (!confirm(lang('phone_starts_with_8'))) {
                 $phoneNumber.addClass('is-invalid');
                 $('#form-message').text(lang('invalid_phone'));

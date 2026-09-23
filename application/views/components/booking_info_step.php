@@ -76,6 +76,7 @@
                             <?php endif; ?>
                         </label>
                         <input type="text" id="phone-number" maxlength="60"
+                               placeholder="<?= lang('phone_number_placeholder') ?>"
                                class="<?= $require_phone_number ? 'required' : '' ?> form-control"/>
                     </div>
                 <?php endif; ?>

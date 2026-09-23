@@ -541,6 +541,13 @@ class Calendar extends EA_Controller
 
             $raw_phone = trim((string) ($customer['phone_number'] ?: $customer['mobile_number'] ?? ''));
 
+            // A phone value of "0" means the customer does not want to receive
+            // reminders, so no notification must be sent.
+            if ($raw_phone === '0') {
+                json_response(['success' => false, 'message' => lang('reminder_no_phone')]);
+                return;
+            }
+
             if ($raw_phone !== '' && str_starts_with($raw_phone, '8')) {
                 $this->db->update(
                     $this->db->dbprefix('appointments'),
