@@ -128,6 +128,7 @@
                         <div class="input-group">
                             <span class="input-group-text">+7</span>
                             <input type="text" id="phone-number" maxlength="10" inputmode="numeric"
+                                   placeholder="<?= lang('phone_number_modal_placeholder') ?>"
                                    class="<?= vars('require_phone_number') ? 'required' : '' ?> form-control" disabled/>
                         </div>
                     </div>

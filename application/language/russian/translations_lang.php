@@ -18,6 +18,7 @@ $lang['email'] = 'Эл. почта';
 $lang['phone_number'] = 'Номер телефона';
 $lang['phone'] = 'Телефон';
 $lang['phone_number_placeholder'] = 'Например: +7 900 000-00-00. Введите 0, если SMS-напоминания не нужны';
+$lang['phone_number_modal_placeholder'] = '10 цифр после +7 или 0 (без напоминаний)';
 $lang['address'] = 'Адрес';
 $lang['city'] = 'Город';
 $lang['zip_code'] = 'Индекс';

@@ -18,6 +18,7 @@ $lang['email'] = 'Email';
 $lang['phone_number'] = 'Phone Number';
 $lang['phone'] = 'Phone';
 $lang['phone_number_placeholder'] = 'e.g. +7 900 000-00-00. Enter 0 if you do not need SMS reminders';
+$lang['phone_number_modal_placeholder'] = '10 digits after +7, or 0 (no reminders)';
 $lang['address'] = 'Address';
 $lang['city'] = 'City';
 $lang['zip_code'] = 'Zip Code';
