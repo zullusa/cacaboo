@@ -99,6 +99,7 @@ def _build_smsru(settings: Settings) -> SenderConfig:
 # modem-service instance configured for that provider delivers them.
 FORWARDED_PROVIDERS: dict[str, frozenset[str]] = {
     "beeline": frozenset({"билайн", "beeline", "вымпелком"}),
+    "mts": frozenset({"мтс", "mts"}),
 }
 
 

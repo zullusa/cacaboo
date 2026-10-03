@@ -1,4 +1,4 @@
-// Package poller periodically scans the Keenetic modem SMS inbox and forwards
+// Package poller periodically scans the modem SMS inbox and forwards
 // every message to a Telegram channel, mirroring the sms-service SmsPoller:
 // each SMS is delivered to Telegram and only then deleted from the modem. The
 // phone numbers resolve exactly like the modem worker sends them.
@@ -10,16 +10,22 @@ import (
 	"strings"
 	"time"
 
-	"modem-service/internal/keenetic"
 	"modem-service/internal/metrics"
+	"modem-service/internal/modem"
 )
 
-// Inbox is the subset of the Keenetic client used by the poller (kept small so
+// Inbox is the subset of the modem client used by the poller (kept small so
 // tests can substitute a fake).
 type Inbox interface {
-	ListInbox(ctx context.Context) ([]keenetic.IncomingSMS, error)
+	ListInbox(ctx context.Context) ([]modem.IncomingSMS, error)
 	DeleteSMS(ctx context.Context, id string) error
 }
+
+// dateLayout is the timestamp format both modem backends store ("2026-10-03
+// 10:48:00"). The modems write their own wall clock with no timezone marker, so
+// it is read in the host timezone — exactly how config.parseInboxCutoff reads
+// the cut-off, which keeps the two comparable.
+const dateLayout = "2006-01-02 15:04:05"
 
 // Messenger delivers formatted SMS texts to a channel. *telegram.Sender is the
 // production implementation; tests can substitute a fake.
@@ -36,18 +42,22 @@ type Poller struct {
 	interval       time.Duration
 	ignoreSender   string
 	ignoreKeywords []string
+	ignoreBefore   time.Time
 	label          string
 }
 
 // New builds a poller. ignoreSender and ignoreKeywords mirror the sms-service
-// SMS_IGNORE_SENDER / SMS_IGNORE_KEYWORDS settings.
-func New(inbox Inbox, telegram Messenger, interval time.Duration, ignoreSender, ignoreKeywords, label string) *Poller {
+// SMS_IGNORE_SENDER / SMS_IGNORE_KEYWORDS settings. Messages older than
+// ignoreBefore are left untouched, which keeps a freshly started worker from
+// dumping the modem's whole historical inbox into the channel.
+func New(inbox Inbox, telegram Messenger, interval time.Duration, ignoreSender, ignoreKeywords, label string, ignoreBefore time.Time) *Poller {
 	return &Poller{
 		inbox:          inbox,
 		telegram:       telegram,
 		interval:       interval,
 		ignoreSender:   strings.TrimSpace(ignoreSender),
 		ignoreKeywords: splitKeywords(ignoreKeywords),
+		ignoreBefore:   ignoreBefore,
 		label:          label,
 	}
 }
@@ -70,7 +80,7 @@ func (p *Poller) Run(ctx context.Context) {
 		p.interval, p.ignoreSender,
 	)
 
-	p.poll(ctx)
+	p.Poll(ctx)
 
 	ticker := time.NewTicker(p.interval)
 	defer ticker.Stop()
@@ -80,12 +90,14 @@ func (p *Poller) Run(ctx context.Context) {
 			log.Printf("SMS inbox poller stopped")
 			return
 		case <-ticker.C:
-			p.poll(ctx)
+			p.Poll(ctx)
 		}
 	}
 }
 
-func (p *Poller) poll(ctx context.Context) {
+// Poll runs a single inbox cycle: every message is forwarded to Telegram and
+// then deleted from the modem.
+func (p *Poller) Poll(ctx context.Context) {
 	metrics.PollCycles.Inc(p.label)
 	messages, err := p.inbox.ListInbox(ctx)
 	if err != nil {
@@ -100,6 +112,14 @@ func (p *Poller) poll(ctx context.Context) {
 	log.Printf("Found %d SMS in the modem inbox", len(messages))
 
 	for _, message := range messages {
+		if p.isTooOld(message) {
+			metrics.InboxSkipped.Inc(p.label)
+			log.Printf(
+				"Leaving SMS %s from '%s' on the modem: it predates %s",
+				message.ID, message.From, p.ignoreBefore.Format(dateLayout),
+			)
+			continue
+		}
 		if p.shouldIgnore(message) {
 			metrics.InboxSkipped.Inc(p.label)
 			log.Printf("Ignoring SMS %s from '%s' (OTP/service message)", message.ID, message.From)
@@ -125,7 +145,7 @@ func (p *Poller) poll(ctx context.Context) {
 
 // shouldIgnore mirrors the sms-service poller: only messages from the
 // configured sender whose text contains one of the OTP keywords are skipped.
-func (p *Poller) shouldIgnore(message keenetic.IncomingSMS) bool {
+func (p *Poller) shouldIgnore(message modem.IncomingSMS) bool {
 	if p.ignoreSender == "" {
 		return false
 	}
@@ -141,8 +161,22 @@ func (p *Poller) shouldIgnore(message keenetic.IncomingSMS) bool {
 	return false
 }
 
+// isTooOld reports whether a message was received before the configured cut-off.
+// Such messages are kept on the modem instead of being forwarded.
+func (p *Poller) isTooOld(message modem.IncomingSMS) bool {
+	if p.ignoreBefore.IsZero() {
+		return false
+	}
+	received, err := time.ParseInLocation(dateLayout, strings.TrimSpace(message.Timestamp), time.Local)
+	if err != nil {
+		// An unparsable timestamp must not hide a fresh message.
+		return false
+	}
+	return received.Before(p.ignoreBefore)
+}
+
 // formatMessage mirrors the sms-service SmsPoller message layout.
-func formatMessage(message keenetic.IncomingSMS) string {
+func formatMessage(message modem.IncomingSMS) string {
 	sender := message.From
 	if sender == "" {
 		sender = "—"

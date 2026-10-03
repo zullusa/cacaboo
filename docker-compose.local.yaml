@@ -1,29 +1,50 @@
 # docker-compose.local.yaml
 #
-# Runs the provider-specific Keenetic modem SMS worker (Go). The worker
-# consumes the provider's own queue (RABBITMQ_QUEUE from the env file), sends
-# each SMS through the modem described in the same env file (MODEM_*) and
-# publishes the successful delivery to the notified feedback queue
+# Runs the provider-specific modem SMS worker (Go). Each provider has its own
+# service: its own env file (queue, modem, Telegram channel) and its own metrics
+# port on the host. The worker consumes the provider's queue (RABBITMQ_QUEUE from
+# the env file), sends each SMS through the modem described in the same env file
+# (MODEM_*) and publishes the successful delivery to the notified feedback queue
 # (RABBITMQ_NOTIFIED_*), exactly like the sms-service does.
 #
-# The provider env file is selected through PROVIDER_ENV_FILE, so this single
-# compose file can serve any provider (or several, one per env file):
+# The env files are NOT in git (.gitignore: /.env*) — copy .env.beeline /
+# .env.mts to the machine by hand before the first start.
 #
-#   docker compose -f docker-compose.local.yaml up -d --build
-#     -> uses .env.beeline  (queue notifications_beeline, Beeline modem)
+# Start one provider:
 #
-#   PROVIDER_ENV_FILE=.env.mts docker compose -f docker-compose.local.yaml up -d --build
-#     -> same worker, but the .env.mts modem / queue (e.g. MTS)
+#   docker compose -p modem-beeline -f docker-compose.local.yaml up -d modem-service-beeline
+#   docker compose -p modem-mts     -f docker-compose.local.yaml up -d modem-service-mts
 #
-# To run several providers at once give each its own compose project name:
+# Start both at once (single project "modem"):
 #
-#   PROVIDER_ENV_FILE=.env.beeline docker compose -p modem-beeline -f docker-compose.local.yaml up -d --build
-#   PROVIDER_ENV_FILE=.env.mts     docker compose -p modem-mts     -f docker-compose.local.yaml up -d --build
+#   docker compose -f docker-compose.local.yaml up -d
+#
+# Why the metrics ports are pinned per service: a host port can only be
+# published once. If two instances both try to publish 8004, Docker does not stop
+# the start — it silently leaves the loser without a network (only loopback
+# inside), and the worker then reports "network is unreachable" for the modem and
+# a DNS "connection refused" for RabbitMQ. Adding a third provider means adding a
+# service with its own free host port (8006, 8007, …).
+#
+# A Huawei modem in NDIS mode is reached over the host's own network: the
+# container is NAT'd through the host, so MODEM_URL_BASE only has to be
+# routable from the host (192.168.8.1 for a stock E3372). No extra network
+# mode is needed.
 services:
+  # Beeline: modem behind a Keenetic router (NDM/RCI), needs MODEM_USER/PASSWORD.
   modem-service-beeline:
     build: modem-service
     env_file:
-      - ${PROVIDER_ENV_FILE:-.env.beeline}
+      - .env.beeline
     ports:
-      - '${MODEM_METRICS_PORT:-8004}:8004'
+      - '8004:8004'
+    restart: always
+
+  # MTS: Huawei E3372 in NDIS mode, no router credentials.
+  modem-service-mts:
+    build: modem-service
+    env_file:
+      - .env.mts
+    ports:
+      - '8005:8004'
     restart: always

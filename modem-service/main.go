@@ -15,8 +15,10 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 
 	"modem-service/internal/config"
+	"modem-service/internal/huawei"
 	"modem-service/internal/keenetic"
 	"modem-service/internal/metrics"
+	"modem-service/internal/modem"
 	"modem-service/internal/poller"
 	"modem-service/internal/queue"
 	"modem-service/internal/telegram"
@@ -37,13 +39,10 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	client := keenetic.New(
-		cfg.ModemURLBase,
-		cfg.ModemUser,
-		cfg.ModemPassword,
-		cfg.ModemName,
-		cfg.HTTPTimeout,
-	)
+	client, err := newModemClient(cfg)
+	if err != nil {
+		log.Fatalf("cannot use the modem: %v", err)
+	}
 
 	startPoller(ctx, cfg, client)
 
@@ -63,9 +62,33 @@ func main() {
 	handlerQueue(ctx, consumer, worker.New(cfg, client))
 }
 
+// newModemClient builds the modem backend named by MODEM_KIND. Both backends
+// speak the same two operations, so the caller only needs the modem contracts.
+func newModemClient(cfg *config.Config) (modem.Client, error) {
+	switch cfg.ModemKind {
+	case config.ModemKindHuawei:
+		return huawei.New(huawei.Options{
+			BaseURL:            cfg.ModemURLBase,
+			HTTPTimeout:        cfg.HTTPTimeout,
+			PageSize:           cfg.ModemSMSPageSize,
+			MaxPages:           cfg.ModemSMSMaxPages,
+			ReportTimeout:      cfg.ModemReportTimeout,
+			ReportPollInterval: cfg.ModemReportPollInterval,
+		}), nil
+	default:
+		return keenetic.New(
+			cfg.ModemURLBase,
+			cfg.ModemUser,
+			cfg.ModemPassword,
+			cfg.ModemName,
+			cfg.HTTPTimeout,
+		), nil
+	}
+}
+
 // startPoller launches the modem inbox -> Telegram forwarder unless the
 // Telegram integration is not configured.
-func startPoller(ctx context.Context, cfg *config.Config, client *keenetic.Client) {
+func startPoller(ctx context.Context, cfg *config.Config, inbox poller.Inbox) {
 	if cfg.TelegramBotToken == "" || cfg.TelegramChannelID == "" {
 		log.Printf("SMS inbox poller disabled (requires TELEGRAM_BOT_TOKEN and TELEGRAM_CHANNEL_ID)")
 		return
@@ -78,12 +101,13 @@ func startPoller(ctx context.Context, cfg *config.Config, client *keenetic.Clien
 		15*time.Second,
 	)
 	p := poller.New(
-		client,
+		inbox,
 		sender,
 		cfg.SmsPollInterval,
 		cfg.SmsIgnoreSender,
 		cfg.SmsIgnoreKeywords,
 		cfg.Provider,
+		cfg.SmsIgnoreBefore,
 	)
 	go p.Run(ctx)
 }

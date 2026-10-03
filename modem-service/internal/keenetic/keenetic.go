@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"modem-service/internal/modem"
 )
 
 // Client talks to a Keenetic router NDM API: it performs the challenge-response
@@ -61,13 +63,9 @@ func (c *Client) Send(ctx context.Context, phone, text string) error {
 	return nil
 }
 
-// IncomingSMS is one SMS stored in the modem's inbox.
-type IncomingSMS struct {
-	ID        string
-	From      string
-	Timestamp string
-	Text      string
-}
+// IncomingSMS is one SMS stored in the modem's inbox. It is an alias of the
+// vendor-independent type so the poller does not depend on the modem backend.
+type IncomingSMS = modem.IncomingSMS
 
 // ListInbox returns every SMS currently stored on the modem interface. The
 // returned IDs are the modem-local message ids (e.g. "nv-6").
