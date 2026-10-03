@@ -59,6 +59,8 @@ def env(name: str, default: str = "") -> str:
 
 ADDRESS = env("ADDRESS", "Пушкина,19")
 CONTACT_PHONE = env("CONTACT_PHONE", "+74955554433")
+COMPANY_NAME = env("COMPANY_NAME", "СТО")
+DOMAIN = env("DOMAIN", "example.com")
 
 def get_db_config() -> dict:
     return {
@@ -127,9 +129,11 @@ def _to_int(value) -> int | None:
 
 def build_message(start_datetime: datetime) -> str:
     return (
-        f"Добрый день! Вы записаны на СТО по адресу "
-        f"{ADDRESS} в {start_datetime:%H:%M} {start_datetime:%d.%m.%Y}. "
-        f"Связь с нами {CONTACT_PHONE}"
+        f"Добрый день!\n"
+        f"Запись на {COMPANY_NAME} по адресу\n"
+        f"{ADDRESS} в {start_datetime:%H:%M} {start_datetime:%d.%m.%Y}\n"
+        f"Звоните {CONTACT_PHONE}\n"
+        f"https://{DOMAIN}"
     )
 
 
