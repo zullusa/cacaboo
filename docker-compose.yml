@@ -25,11 +25,6 @@ services:
       - GOOGLE_SYNC_FEATURE=${GOOGLE_SYNC_FEATURE}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - ADDRESS=${ADDRESS}
-      - CONTACT_PHONE=${CONTACT_PHONE}
-      - REMINDER_TYPE=${WORKER_TYPE}
-      - REMINDER_SUBJECT=${WORKER_SUBJECT}
-      - REMINDER_PHONE_PREFIX=${REMINDER_PHONE_PREFIX}
     volumes:
       - '.:/var/www/html'
       - './docker/php-fpm/php-ini-overrides.ini:/usr/local/etc/php/conf.d/99-overrides.ini'
@@ -346,7 +341,6 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_UNIFIED_ALERTING_ENABLED=true
       - GF_PROVISIONING_ENABLED=true
-      - OPENSEARCH_PASSWORD=${OPENSEARCH_PASSWORD:-admin}
     volumes:
       - 'grafana-data:/var/lib/grafana'
       - './docker/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro'
@@ -499,8 +493,6 @@ services:
     image: fluent/fluent-bit:3.1
     container_name: fluent-bit
     restart: unless-stopped
-    environment:
-      - OPENSEARCH_PASSWORD=${OPENSEARCH_PASSWORD:-opensearch}
     volumes:
       - './docker/monitoring/fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro'
       - './docker/monitoring/fluent-bit/parsers.conf:/fluent-bit/etc/parsers.conf:ro'
