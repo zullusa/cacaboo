@@ -2446,39 +2446,6 @@ paths:
                   success:
                     type: boolean
 
-  /calendar/notify_appointment:
-    post:
-      tags:
-        - backend_calendar
-      summary: >
-        Sends a reminder notification right away. Only available for
-        appointments that start in less than 24 hours. Publishes the same
-        payload as the one day ahead reminder of the reminder worker and marks
-        the appointment as notified after a successful delivery.
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              required: [csrf_token, appointment_id]
-              properties:
-                csrf_token:
-                  type: string
-                appointment_id:
-                  type: integer
-      responses:
-        '200':
-          description: Publish result.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  message:
-                    type: string
-
   /calendar/save_unavailability:
     post:
       tags:
